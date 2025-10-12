@@ -7,6 +7,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import { ArrowLeft, Trash2 } from "lucide-react";
+import { MobileReservationCard } from "@/components/MobileReservationCard";
+import { MobileNav } from "@/components/MobileNav";
 
 const MyReservations = () => {
   const navigate = useNavigate();
@@ -95,8 +97,9 @@ const MyReservations = () => {
   if (!user) return null;
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="border-b">
+    <div className="min-h-screen bg-background pb-20 md:pb-0">
+      {/* Desktop Header */}
+      <header className="border-b hidden md:block">
         <div className="container mx-auto px-4 py-4 flex items-center gap-4">
           <Button variant="ghost" onClick={() => navigate("/")}>
             <ArrowLeft className="h-4 w-4 mr-2" />
@@ -106,8 +109,19 @@ const MyReservations = () => {
         </div>
       </header>
 
-      <main className="container mx-auto px-4 py-8 space-y-8">
-        <Card>
+      {/* Mobile Header */}
+      <header className="border-b md:hidden sticky top-0 bg-background z-30">
+        <div className="px-4 py-3 flex items-center gap-3">
+          <Button variant="ghost" size="icon" onClick={() => navigate("/")}>
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+          <h1 className="text-lg font-bold">Mes réservations</h1>
+        </div>
+      </header>
+
+      <main className="container mx-auto px-2 md:px-4 py-4 md:py-8 space-y-6 md:space-y-8">
+        {/* Active Reservations - Desktop */}
+        <Card className="hidden md:block">
           <CardHeader>
             <CardTitle>Réservations à venir</CardTitle>
             <CardDescription>
@@ -158,7 +172,35 @@ const MyReservations = () => {
           </CardContent>
         </Card>
 
-        <Card>
+        {/* Active Reservations - Mobile */}
+        <div className="md:hidden space-y-3">
+          <div className="px-2">
+            <h2 className="text-lg font-semibold mb-1">À venir</h2>
+            <p className="text-sm text-muted-foreground">
+              {activeReservations.length} réservation{activeReservations.length > 1 ? "s" : ""}
+            </p>
+          </div>
+          {activeReservations.length === 0 ? (
+            <Card className="p-6">
+              <p className="text-muted-foreground text-center text-sm">Aucune réservation active</p>
+            </Card>
+          ) : (
+            <div className="space-y-3">
+              {activeReservations.map((res) => (
+                <MobileReservationCard
+                  key={res.id}
+                  reservation={res}
+                  userId={user.id}
+                  onCancel={handleCancel}
+                  showCancelButton
+                />
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Past Reservations - Desktop */}
+        <Card className="hidden md:block">
           <CardHeader>
             <CardTitle>Historique</CardTitle>
             <CardDescription>
@@ -200,7 +242,37 @@ const MyReservations = () => {
             )}
           </CardContent>
         </Card>
+
+        {/* Past Reservations - Mobile */}
+        <div className="md:hidden space-y-3">
+          <div className="px-2">
+            <h2 className="text-lg font-semibold mb-1">Historique</h2>
+            <p className="text-sm text-muted-foreground">
+              {pastReservations.length} réservation{pastReservations.length > 1 ? "s" : ""}
+            </p>
+          </div>
+          {pastReservations.length === 0 ? (
+            <Card className="p-6">
+              <p className="text-muted-foreground text-center text-sm">Aucune réservation passée</p>
+            </Card>
+          ) : (
+            <div className="space-y-3 opacity-60">
+              {pastReservations.map((res) => (
+                <MobileReservationCard
+                  key={res.id}
+                  reservation={res}
+                  userId={user.id}
+                  onCancel={handleCancel}
+                  showCancelButton={false}
+                />
+              ))}
+            </div>
+          )}
+        </div>
       </main>
+
+      {/* Mobile Navigation */}
+      <MobileNav userId={user.id} onBookingOpen={() => {}} />
     </div>
   );
 };

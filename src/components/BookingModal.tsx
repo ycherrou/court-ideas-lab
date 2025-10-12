@@ -178,13 +178,13 @@ export const BookingModal = ({ open, onOpenChange, userId, onSuccess }: BookingM
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Réserver un terrain</DialogTitle>
+          <DialogTitle className="text-lg md:text-xl">Réserver un terrain</DialogTitle>
         </DialogHeader>
 
         {step === 1 && (
-          <div className="flex flex-col items-center space-y-4">
+          <div className="flex flex-col items-center space-y-4 py-2">
             <Calendar
               mode="single"
               selected={selectedDate}
@@ -194,22 +194,25 @@ export const BookingModal = ({ open, onOpenChange, userId, onSuccess }: BookingM
                 today.setHours(0, 0, 0, 0);
                 return date < today || date > addDays(new Date(), 7);
               }}
-              className="pointer-events-auto"
+              className="pointer-events-auto rounded-md border p-3"
             />
+            <p className="text-sm text-muted-foreground text-center px-4">
+              Sélectionnez une date dans les 7 prochains jours
+            </p>
           </div>
         )}
 
         {step === 2 && (
-          <div className="space-y-4">
-            <div>
-              <label className="text-sm font-medium">Terrain</label>
+          <div className="space-y-5 py-2">
+            <div className="space-y-2">
+              <label className="text-sm font-medium block">Terrain</label>
               <Select value={selectedCourt} onValueChange={handleCourtChange}>
-                <SelectTrigger>
+                <SelectTrigger className="h-12">
                   <SelectValue placeholder="Sélectionnez un terrain" />
                 </SelectTrigger>
                 <SelectContent>
                   {courts.map((court) => (
-                    <SelectItem key={court.id} value={court.id}>
+                    <SelectItem key={court.id} value={court.id} className="py-3">
                       {court.name}
                     </SelectItem>
                   ))}
@@ -217,17 +220,17 @@ export const BookingModal = ({ open, onOpenChange, userId, onSuccess }: BookingM
               </Select>
             </div>
 
-            <div>
-              <label className="text-sm font-medium">Créneau</label>
+            <div className="space-y-2">
+              <label className="text-sm font-medium block">Créneau</label>
               <Select value={selectedTime} onValueChange={setSelectedTime}>
-                <SelectTrigger>
+                <SelectTrigger className="h-12">
                   <SelectValue placeholder="Sélectionnez un créneau" />
                 </SelectTrigger>
                 <SelectContent>
                   {getFilteredSlots().map((slot) => {
                     const hour = parseInt(slot.split(":")[0]);
                     return (
-                      <SelectItem key={slot} value={slot}>
+                      <SelectItem key={slot} value={slot} className="py-3">
                         {hour}h - {hour + 1}h
                       </SelectItem>
                     );
@@ -236,8 +239,8 @@ export const BookingModal = ({ open, onOpenChange, userId, onSuccess }: BookingM
               </Select>
             </div>
 
-            <div>
-              <label className="text-sm font-medium">Partenaire</label>
+            <div className="space-y-2">
+              <label className="text-sm font-medium block">Partenaire</label>
               <PartnerSelector
                 userId={userId}
                 selectedDate={selectedDate!}
@@ -246,12 +249,12 @@ export const BookingModal = ({ open, onOpenChange, userId, onSuccess }: BookingM
               />
             </div>
 
-            <div className="flex gap-2">
-              <Button variant="outline" onClick={() => setStep(1)}>
+            <div className="flex gap-3 pt-4">
+              <Button variant="outline" onClick={() => setStep(1)} className="h-12 flex-1">
                 Retour
               </Button>
-              <Button onClick={handleConfirm} disabled={loading} className="flex-1">
-                {loading ? "Création..." : "Confirmer"}
+              <Button onClick={handleConfirm} disabled={loading} className="h-12 flex-[2]">
+                {loading ? "Création..." : "Confirmer la réservation"}
               </Button>
             </div>
           </div>

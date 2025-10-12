@@ -7,6 +7,7 @@ import { BookingModal } from "@/components/BookingModal";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Calendar, LogOut, Settings } from "lucide-react";
+import { MobileNav } from "@/components/MobileNav";
 
 const Index = () => {
   const navigate = useNavigate();
@@ -33,8 +34,9 @@ const Index = () => {
   if (!user) return null;
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="border-b">
+    <div className="min-h-screen bg-background pb-20 md:pb-0">
+      {/* Desktop Header */}
+      <header className="border-b hidden md:block">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Calendar className="h-6 w-6 text-primary" />
@@ -60,8 +62,19 @@ const Index = () => {
         </div>
       </header>
 
-      <main className="container mx-auto px-4 py-8">
-        <div className="mb-6 flex items-center justify-between">
+      {/* Mobile Header */}
+      <header className="border-b md:hidden sticky top-0 bg-background z-30">
+        <div className="px-4 py-3 flex items-center justify-center">
+          <div className="flex items-center gap-2">
+            <Calendar className="h-5 w-5 text-primary" />
+            <h1 className="text-lg font-bold">Tennis Club</h1>
+          </div>
+        </div>
+      </header>
+
+      <main className="container mx-auto px-2 md:px-4 py-4 md:py-8">
+        {/* Desktop Title and Button */}
+        <div className="mb-6 hidden md:flex items-center justify-between">
           <h2 className="text-xl font-semibold">
             Réservations du {new Date().toLocaleDateString("fr-FR", {
               weekday: "long",
@@ -76,8 +89,22 @@ const Index = () => {
           </Button>
         </div>
 
+        {/* Mobile Title */}
+        <div className="mb-4 md:hidden">
+          <h2 className="text-base font-semibold text-center">
+            {new Date().toLocaleDateString("fr-FR", {
+              weekday: "long",
+              day: "numeric",
+              month: "long",
+            })}
+          </h2>
+        </div>
+
         <ReservationGrid key={refreshKey} date={new Date()} userId={user.id} />
       </main>
+
+      {/* Mobile Navigation */}
+      <MobileNav userId={user.id} onBookingOpen={() => setBookingOpen(true)} />
 
       <BookingModal
         open={bookingOpen}

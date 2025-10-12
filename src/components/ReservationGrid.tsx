@@ -101,10 +101,10 @@ export const ReservationGrid = ({ date, userId }: { date: Date; userId?: string 
 
     if (blocked) {
       return (
-        <div className="h-full bg-destructive/20 border-destructive/40 flex items-center justify-center p-2 text-center text-xs">
+        <div className="h-full bg-destructive/20 border-destructive/40 flex items-center justify-center p-1 md:p-2 text-center text-[10px] md:text-xs">
           <div>
             <div className="font-semibold">BLOQUÉ</div>
-            <div className="text-muted-foreground">{blocked.reason}</div>
+            <div className="text-muted-foreground hidden md:block">{blocked.reason}</div>
           </div>
         </div>
       );
@@ -150,23 +150,23 @@ export const ReservationGrid = ({ date, userId }: { date: Date; userId?: string 
   }
 
   return (
-    <div className="overflow-x-auto">
-      <div className="min-w-max">
-        <div className="grid grid-cols-[100px_repeat(10,minmax(120px,1fr))] gap-1">
-          <div className="font-semibold p-2 bg-muted"></div>
+    <div className="overflow-x-auto -mx-2 md:mx-0">
+      <div className="min-w-max px-2 md:px-0">
+        <div className="grid grid-cols-[60px_repeat(10,minmax(100px,1fr))] md:grid-cols-[100px_repeat(10,minmax(120px,1fr))] gap-1">
+          <div className="font-semibold p-1 md:p-2 bg-muted"></div>
           {courts.map((court) => (
-            <div key={court.id} className="font-semibold p-2 bg-muted text-center text-sm">
-              {court.name}
+            <div key={court.id} className="font-semibold p-1 md:p-2 bg-muted text-center text-xs md:text-sm">
+              {court.name.replace("Terrain ", "T")}
             </div>
           ))}
 
           {HOURS.map((hour) => (
             <>
-              <div key={`hour-${hour}`} className="font-medium p-2 bg-muted text-sm">
-                {hour}h-{hour + 1}h
+              <div key={`hour-${hour}`} className="font-medium p-1 md:p-2 bg-muted text-xs md:text-sm">
+                {hour}h
               </div>
               {courts.map((court) => (
-                <Card key={`${court.id}-${hour}`} className="min-h-[80px]">
+                <Card key={`${court.id}-${hour}`} className="min-h-[60px] md:min-h-[80px]">
                   {getSlotContent(court.id, hour)}
                 </Card>
               ))}
