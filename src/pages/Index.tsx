@@ -26,13 +26,9 @@ const Index = () => {
   const [api, setApi] = useState<CarouselApi>();
   const [currentSlide, setCurrentSlide] = useState(0);
   
-  // Generate week days starting from Monday
+  // Generate 7 days starting from today
   const today = new Date();
-  const monday = startOfWeek(today, { weekStartsOn: 1 });
-  const weekDays = Array.from({ length: 7 }, (_, i) => addDays(monday, i));
-  const todayIndex = weekDays.findIndex(
-    day => format(day, 'yyyy-MM-dd') === format(today, 'yyyy-MM-dd')
-  );
+  const weekDays = Array.from({ length: 7 }, (_, i) => addDays(today, i));
 
   const handleSlotClick = (courtId: string, courtName: string, hour: number) => {
     const timeStr = `${hour.toString().padStart(2, "0")}:00:00`;
@@ -60,16 +56,13 @@ const Index = () => {
   useEffect(() => {
     if (!api) return;
     
-    // Set initial slide to today
-    if (todayIndex !== -1) {
-      api.scrollTo(todayIndex, true);
-      setCurrentSlide(todayIndex);
-    }
+    // Start at first slide (today)
+    setCurrentSlide(0);
 
     api.on("select", () => {
       setCurrentSlide(api.selectedScrollSnap());
     });
-  }, [api, todayIndex]);
+  }, [api]);
 
   if (authLoading || roleLoading) {
     return (
@@ -136,7 +129,7 @@ const Index = () => {
         {/* Mobile Title */}
         <div className="mb-4 md:hidden">
           <h2 className="text-base font-semibold text-center">
-            Semaine du {format(monday, 'd MMMM yyyy', { locale: fr })}
+            Prochains 7 jours
           </h2>
         </div>
 
@@ -149,12 +142,12 @@ const Index = () => {
           }}
         >
           <div className="flex items-center justify-between mb-4">
-            <CarouselPrevious className="relative static translate-y-0" />
+            <div className="w-10"></div>
             <div className="text-center flex-1">
               <h3 className="text-lg font-semibold">
                 {format(weekDays[currentSlide], 'EEEE d MMMM yyyy', { locale: fr })}
               </h3>
-              {currentSlide === todayIndex && (
+              {currentSlide === 0 && (
                 <span className="text-sm text-primary">Aujourd'hui</span>
               )}
             </div>
