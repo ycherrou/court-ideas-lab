@@ -83,6 +83,35 @@ export const BookingModal = ({ open, onOpenChange, userId, onSuccess }: BookingM
       const hour = parseInt(hourStr);
       const endTime = `${(hour + 1).toString().padStart(2, "0")}:00:00`;
 
+      // Verify slot is not blocked
+      const { data: blockedSlots } = await supabase
+        .from("blocked_slots")
+        .select("*")
+        .eq("date", dateStr)
+        .eq("court_id", selectedCourt)
+        .lte("start_time", selectedTime)
+        .gte("end_time", selectedTime);
+
+      if (blockedSlots && blockedSlots.length > 0) {
+        toast.error("Ce créneau est bloqué");
+        setLoading(false);
+        return;
+      }
+
+      // Verify slot is not already reserved
+      const { data: existingReservations } = await supabase
+        .from("reservations")
+        .select("*")
+        .eq("date", dateStr)
+        .eq("court_id", selectedCourt)
+        .eq("start_time", selectedTime);
+
+      if (existingReservations && existingReservations.length > 0) {
+        toast.error("Ce créneau est déjà réservé");
+        setLoading(false);
+        return;
+      }
+
       const { error } = await supabase.from("reservations").insert({
         court_id: selectedCourt,
         date: dateStr,
