@@ -6,11 +6,12 @@ import { ReservationGrid } from "@/components/ReservationGrid";
 import { BookingModal } from "@/components/BookingModal";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Calendar, LogOut, Settings, ChevronLeft, ChevronRight } from "lucide-react";
+import { Calendar, LogOut, Settings, ChevronRight } from "lucide-react";
 import { MobileNav } from "@/components/MobileNav";
 import { Carousel, CarouselContent, CarouselItem, CarouselApi } from "@/components/ui/carousel";
-import { addDays, format, startOfWeek } from "date-fns";
+import { addDays, format } from "date-fns";
 import { fr } from "date-fns/locale";
+import rtcLogo from "@/assets/rtc-logo.png";
 
 const Index = () => {
   const navigate = useNavigate();
@@ -84,9 +85,12 @@ const Index = () => {
       {/* Desktop Header */}
       <header className="border-b hidden md:block">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Calendar className="h-6 w-6 text-primary" />
-            <h1 className="text-2xl font-bold">Tennis Club</h1>
+          <div className="flex items-center gap-3">
+            <img src={rtcLogo} alt="Royal Tennis Club" className="h-12 w-auto" />
+            <div>
+              <h1 className="text-xl font-bold">Royal Tennis Club</h1>
+              <p className="text-xs text-muted-foreground">de Marrakech</p>
+            </div>
           </div>
           <div className="flex items-center gap-4">
             <span className="text-sm text-muted-foreground">
@@ -116,10 +120,11 @@ const Index = () => {
 
       {/* Mobile Header */}
       <header className="border-b md:hidden sticky top-0 bg-background z-30">
-        <div className="px-4 py-3 flex items-center justify-center">
-          <div className="flex items-center gap-2">
-            <Calendar className="h-5 w-5 text-primary" />
-            <h1 className="text-lg font-bold">Tennis Club</h1>
+        <div className="px-4 py-3 flex items-center justify-center gap-2">
+          <img src={rtcLogo} alt="Royal Tennis Club" className="h-10 w-auto" />
+          <div>
+            <h1 className="text-base font-bold leading-tight">Royal Tennis Club</h1>
+            <p className="text-xs text-muted-foreground leading-tight">de Marrakech</p>
           </div>
         </div>
       </header>
