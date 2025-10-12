@@ -99,6 +99,8 @@ export const BookingModal = ({ open, onOpenChange, userId, onSuccess }: BookingM
       onSuccess();
       onOpenChange(false);
       resetModal();
+      // Force page refresh to show new reservation
+      window.location.reload();
     } catch (error: any) {
       toast.error(error.message);
     } finally {
