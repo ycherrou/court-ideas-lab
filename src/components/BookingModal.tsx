@@ -24,12 +24,40 @@ export const BookingModal = ({ open, onOpenChange, userId, onSuccess }: BookingM
   const [partners, setPartners] = useState<any[]>([]);
   const [courts, setCourts] = useState<any[]>([]);
   const [availableSlots, setAvailableSlots] = useState<string[]>([]);
+  const [reservationsData, setReservationsData] = useState<any[]>([]);
+  const [blockedSlotsData, setBlockedSlotsData] = useState<any[]>([]);
+
+  // Filter slots based on selected court
+  const getFilteredSlots = () => {
+    if (!selectedCourt) return [];
+
+    const allSlots = [];
+    for (let hour = 7; hour < 21; hour++) {
+      allSlots.push(`${hour.toString().padStart(2, "0")}:00:00`);
+    }
+
+    return allSlots.filter((slot) => {
+      // Check if blocked
+      const isBlocked = blockedSlotsData.some(
+        (b) =>
+          b.court_id === selectedCourt &&
+          slot >= b.start_time &&
+          slot < b.end_time
+      );
+
+      // Check if reserved
+      const isReserved = reservationsData.some(
+        (r) => r.court_id === selectedCourt && r.start_time === slot
+      );
+
+      return !isBlocked && !isReserved;
+    });
+  };
 
   // Reload slots when court changes
   const handleCourtChange = async (courtId: string) => {
     setSelectedCourt(courtId);
     setSelectedTime(""); // Reset time when court changes
-    await handleSlotSelect(); // Reload slots for new court
   };
 
   const handleDateSelect = async (date: Date | undefined) => {
@@ -68,34 +96,8 @@ export const BookingModal = ({ open, onOpenChange, userId, onSuccess }: BookingM
 
     if (courtsData.data) setCourts(courtsData.data);
     if (profiles.data) setPartners(profiles.data);
-
-    // Generate all time slots (7h to 20h)
-    const allSlots = [];
-    for (let hour = 7; hour < 21; hour++) {
-      allSlots.push(`${hour.toString().padStart(2, "0")}:00:00`);
-    }
-
-    // Filter out blocked and reserved slots for the selected court
-    const filteredSlots = allSlots.filter((slot) => {
-      if (!selectedCourt) return true;
-
-      // Check if blocked
-      const isBlocked = blocked.data?.some(
-        (b) =>
-          b.court_id === selectedCourt &&
-          slot >= b.start_time &&
-          slot < b.end_time
-      );
-
-      // Check if reserved
-      const isReserved = reservations.data?.some(
-        (r) => r.court_id === selectedCourt && r.start_time === slot
-      );
-
-      return !isBlocked && !isReserved;
-    });
-
-    setAvailableSlots(filteredSlots);
+    if (reservations.data) setReservationsData(reservations.data);
+    if (blocked.data) setBlockedSlotsData(blocked.data);
   };
 
   const handleConfirm = async () => {
@@ -221,7 +223,7 @@ export const BookingModal = ({ open, onOpenChange, userId, onSuccess }: BookingM
                   <SelectValue placeholder="Sélectionnez un créneau" />
                 </SelectTrigger>
                 <SelectContent>
-                  {availableSlots.map((slot) => {
+                  {getFilteredSlots().map((slot) => {
                     const hour = parseInt(slot.split(":")[0]);
                     return (
                       <SelectItem key={slot} value={slot}>
