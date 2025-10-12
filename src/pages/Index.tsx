@@ -92,15 +92,21 @@ const Index = () => {
             <span className="text-sm text-muted-foreground">
               {user.email}
             </span>
-            {isAdmin && (
-              <Button variant="outline" onClick={() => navigate("/admin")}>
-                <Settings className="h-4 w-4 mr-2" />
-                Gestion
+            {isAdmin ? (
+              <>
+                <Button variant="outline" onClick={() => navigate("/admin")}>
+                  <Settings className="h-4 w-4 mr-2" />
+                  Gestion
+                </Button>
+                <Button variant="outline" onClick={() => navigate("/mes-reservations")}>
+                  Toutes les réservations
+                </Button>
+              </>
+            ) : (
+              <Button variant="outline" onClick={() => navigate("/mes-reservations")}>
+                Mes réservations
               </Button>
             )}
-            <Button variant="outline" onClick={() => navigate("/mes-reservations")}>
-              Mes réservations
-            </Button>
             <Button variant="ghost" onClick={signOut}>
               <LogOut className="h-4 w-4" />
             </Button>

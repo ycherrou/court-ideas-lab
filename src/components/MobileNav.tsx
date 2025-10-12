@@ -40,7 +40,7 @@ export function MobileNav({ userId, onBookingOpen }: MobileNavProps) {
             className="flex flex-col items-center justify-center gap-1 text-xs hover:bg-accent active:bg-accent"
           >
             <User className="h-5 w-5" />
-            <span>Mes résa</span>
+            <span>{isAdmin ? "Toutes" : "Mes résa"}</span>
           </button>
           <button
             onClick={() => setMenuOpen(!menuOpen)}
