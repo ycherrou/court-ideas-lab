@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Calendar, LogOut, Settings, ChevronLeft, ChevronRight } from "lucide-react";
 import { MobileNav } from "@/components/MobileNav";
-import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious, CarouselApi } from "@/components/ui/carousel";
+import { Carousel, CarouselContent, CarouselItem, CarouselApi } from "@/components/ui/carousel";
 import { addDays, format, startOfWeek } from "date-fns";
 import { fr } from "date-fns/locale";
 
@@ -56,12 +56,16 @@ const Index = () => {
   useEffect(() => {
     if (!api) return;
     
-    // Start at first slide (today)
-    setCurrentSlide(0);
-
-    api.on("select", () => {
-      setCurrentSlide(api.selectedScrollSnap());
-    });
+    api.scrollTo(0);
+    const onSelect = () => setCurrentSlide(api.selectedScrollSnap());
+    onSelect();
+    api.on("select", onSelect);
+    api.on("reInit", onSelect);
+    
+    return () => {
+      api.off("select", onSelect);
+      api.off("reInit", onSelect);
+    };
   }, [api]);
 
   if (authLoading || roleLoading) {
@@ -137,7 +141,9 @@ const Index = () => {
           setApi={setApi}
           className="w-full"
           opts={{
-            align: "center",
+            align: "start",
+            containScroll: "trimSnaps",
+            slidesToScroll: 1,
             loop: false,
             dragFree: false,
           }}
@@ -152,7 +158,16 @@ const Index = () => {
                 <span className="text-sm text-primary">Aujourd'hui</span>
               )}
             </div>
-            <CarouselNext className="relative static translate-y-0" />
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => api?.scrollNext()}
+              disabled={currentSlide >= weekDays.length - 1}
+              className="relative static translate-y-0"
+            >
+              <ChevronRight className="h-4 w-4" />
+              <span className="sr-only">Jour suivant</span>
+            </Button>
           </div>
           
           <CarouselContent>
