@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Calendar, LogOut, Settings } from "lucide-react";
 import { MobileNav } from "@/components/MobileNav";
+import logoRTCM from "@/assets/logo-rtcm.png";
 
 const Index = () => {
   const navigate = useNavigate();
@@ -60,9 +61,9 @@ const Index = () => {
       {/* Desktop Header */}
       <header className="border-b hidden md:block">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Calendar className="h-6 w-6 text-primary" />
-            <h1 className="text-2xl font-bold">Tennis Club</h1>
+          <div className="flex items-center gap-3">
+            <img src={logoRTCM} alt="Royal Tennis Club de Marrakech" className="h-12 w-12 object-contain" />
+            <h1 className="text-2xl font-bold">Royal Tennis Club</h1>
           </div>
           <div className="flex items-center gap-4">
             <span className="text-sm text-muted-foreground">
@@ -88,8 +89,8 @@ const Index = () => {
       <header className="border-b md:hidden sticky top-0 bg-background z-30">
         <div className="px-4 py-3 flex items-center justify-center">
           <div className="flex items-center gap-2">
-            <Calendar className="h-5 w-5 text-primary" />
-            <h1 className="text-lg font-bold">Tennis Club</h1>
+            <img src={logoRTCM} alt="Royal Tennis Club de Marrakech" className="h-10 w-10 object-contain" />
+            <h1 className="text-lg font-bold">Royal Tennis Club</h1>
           </div>
         </div>
       </header>
