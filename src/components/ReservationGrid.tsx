@@ -165,21 +165,33 @@ export const ReservationGrid = ({
   }
 
   return (
-    <div className="overflow-x-auto -mx-2 md:mx-0">
+    <div className="overflow-x-auto overflow-y-auto -mx-2 md:mx-0 max-h-[calc(100vh-250px)]">
       <div className="min-w-max px-2 md:px-0">
         <div className="grid grid-cols-[60px_repeat(10,minmax(100px,1fr))] md:grid-cols-[100px_repeat(10,minmax(120px,1fr))] gap-1">
-          <div className="font-semibold p-1 md:p-2 bg-muted"></div>
+          {/* Empty corner cell - sticky */}
+          <div className="font-semibold p-1 md:p-2 bg-muted sticky top-0 left-0 z-20"></div>
+          
+          {/* Court headers - sticky top */}
           {courts.map((court) => (
-            <div key={court.id} className="font-semibold p-1 md:p-2 bg-muted text-center text-xs md:text-sm">
+            <div 
+              key={court.id} 
+              className="font-semibold p-1 md:p-2 bg-muted text-center text-xs md:text-sm sticky top-0 z-10"
+            >
               {court.name.replace("Terrain ", "T")}
             </div>
           ))}
 
           {HOURS.map((hour) => (
             <>
-              <div key={`hour-${hour}`} className="font-medium p-1 md:p-2 bg-muted text-xs md:text-sm">
+              {/* Hour labels - sticky left */}
+              <div 
+                key={`hour-${hour}`} 
+                className="font-medium p-1 md:p-2 bg-muted text-xs md:text-sm sticky left-0 z-10"
+              >
                 {hour}h
               </div>
+              
+              {/* Court slots */}
               {courts.map((court) => (
                 <Card key={`${court.id}-${hour}`} className="min-h-[60px] md:min-h-[80px] overflow-hidden">
                   {getSlotContent(court.id, court.name, hour)}
