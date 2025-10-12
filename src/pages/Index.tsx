@@ -6,8 +6,11 @@ import { ReservationGrid } from "@/components/ReservationGrid";
 import { BookingModal } from "@/components/BookingModal";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Calendar, LogOut, Settings } from "lucide-react";
+import { Calendar, LogOut, Settings, ChevronLeft, ChevronRight } from "lucide-react";
 import { MobileNav } from "@/components/MobileNav";
+import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious, CarouselApi } from "@/components/ui/carousel";
+import { addDays, format, startOfWeek } from "date-fns";
+import { fr } from "date-fns/locale";
 
 const Index = () => {
   const navigate = useNavigate();
@@ -20,6 +23,16 @@ const Index = () => {
     courtId: string;
     time: string;
   } | null>(null);
+  const [api, setApi] = useState<CarouselApi>();
+  const [currentSlide, setCurrentSlide] = useState(0);
+  
+  // Generate week days starting from Monday
+  const today = new Date();
+  const monday = startOfWeek(today, { weekStartsOn: 1 });
+  const weekDays = Array.from({ length: 7 }, (_, i) => addDays(monday, i));
+  const todayIndex = weekDays.findIndex(
+    day => format(day, 'yyyy-MM-dd') === format(today, 'yyyy-MM-dd')
+  );
 
   const handleSlotClick = (courtId: string, courtName: string, hour: number) => {
     const timeStr = `${hour.toString().padStart(2, "0")}:00:00`;
@@ -43,6 +56,20 @@ const Index = () => {
       navigate("/auth");
     }
   }, [user, authLoading, navigate]);
+
+  useEffect(() => {
+    if (!api) return;
+    
+    // Set initial slide to today
+    if (todayIndex !== -1) {
+      api.scrollTo(todayIndex, true);
+      setCurrentSlide(todayIndex);
+    }
+
+    api.on("select", () => {
+      setCurrentSlide(api.selectedScrollSnap());
+    });
+  }, [api, todayIndex]);
 
   if (authLoading || roleLoading) {
     return (
@@ -98,12 +125,7 @@ const Index = () => {
         {/* Desktop Title and Button */}
         <div className="mb-6 hidden md:flex items-center justify-between">
           <h2 className="text-xl font-semibold">
-            Réservations du {new Date().toLocaleDateString("fr-FR", {
-              weekday: "long",
-              day: "numeric",
-              month: "long",
-              year: "numeric",
-            })}
+            Réservations de la semaine
           </h2>
           <Button onClick={() => setBookingOpen(true)}>
             <Calendar className="h-4 w-4 mr-2" />
@@ -114,20 +136,44 @@ const Index = () => {
         {/* Mobile Title */}
         <div className="mb-4 md:hidden">
           <h2 className="text-base font-semibold text-center">
-            {new Date().toLocaleDateString("fr-FR", {
-              weekday: "long",
-              day: "numeric",
-              month: "long",
-            })}
+            Semaine du {format(monday, 'd MMMM yyyy', { locale: fr })}
           </h2>
         </div>
 
-        <ReservationGrid 
-          key={refreshKey} 
-          date={new Date()} 
-          userId={user.id} 
-          onSlotClick={handleSlotClick}
-        />
+        <Carousel
+          setApi={setApi}
+          className="w-full"
+          opts={{
+            align: "start",
+            loop: false,
+          }}
+        >
+          <div className="flex items-center justify-between mb-4">
+            <CarouselPrevious className="relative static translate-y-0" />
+            <div className="text-center flex-1">
+              <h3 className="text-lg font-semibold">
+                {format(weekDays[currentSlide], 'EEEE d MMMM yyyy', { locale: fr })}
+              </h3>
+              {currentSlide === todayIndex && (
+                <span className="text-sm text-primary">Aujourd'hui</span>
+              )}
+            </div>
+            <CarouselNext className="relative static translate-y-0" />
+          </div>
+          
+          <CarouselContent>
+            {weekDays.map((day, index) => (
+              <CarouselItem key={index}>
+                <ReservationGrid 
+                  key={`${refreshKey}-${index}`} 
+                  date={day} 
+                  userId={user.id} 
+                  onSlotClick={handleSlotClick}
+                />
+              </CarouselItem>
+            ))}
+          </CarouselContent>
+        </Carousel>
       </main>
 
       {/* Mobile Navigation */}
