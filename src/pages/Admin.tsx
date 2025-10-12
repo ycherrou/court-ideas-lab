@@ -15,6 +15,14 @@ import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { ArrowLeft, UserPlus, Trash2, Calendar, Ban } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
+import { z } from "zod";
+
+const newMemberSchema = z.object({
+  firstName: z.string().min(2, "Le prénom doit contenir au moins 2 caractères"),
+  lastName: z.string().min(2, "Le nom doit contenir au moins 2 caractères"),
+  email: z.string().email("Email invalide"),
+  password: z.string().min(6, "Le mot de passe doit contenir au moins 6 caractères"),
+});
 
 const Admin = () => {
   const navigate = useNavigate();
@@ -25,6 +33,7 @@ const Admin = () => {
   const [blockedSlots, setBlockedSlots] = useState<any[]>([]);
   const [courts, setCourts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [addMemberOpen, setAddMemberOpen] = useState(false);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -95,6 +104,45 @@ const Admin = () => {
     }
   };
 
+  const handleAddMember = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const formData = new FormData(e.currentTarget);
+
+    const data = {
+      firstName: formData.get("firstName") as string,
+      lastName: formData.get("lastName") as string,
+      email: formData.get("email") as string,
+      password: formData.get("password") as string,
+    };
+
+    try {
+      newMemberSchema.parse(data);
+
+      const { error } = await supabase.auth.admin.createUser({
+        email: data.email,
+        password: data.password,
+        email_confirm: true,
+        user_metadata: {
+          first_name: data.firstName,
+          last_name: data.lastName,
+        },
+      });
+
+      if (error) throw error;
+
+      toast.success("Membre ajouté avec succès");
+      setAddMemberOpen(false);
+      fetchData();
+      (e.target as HTMLFormElement).reset();
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        toast.error(error.errors[0].message);
+      } else if (error instanceof Error) {
+        toast.error(error.message);
+      }
+    }
+  };
+
   const handleCreateBlockedSlot = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
@@ -161,6 +209,40 @@ const Admin = () => {
                       {members.length} membre{members.length > 1 ? "s" : ""} inscrit{members.length > 1 ? "s" : ""}
                     </CardDescription>
                   </div>
+                  <Dialog open={addMemberOpen} onOpenChange={setAddMemberOpen}>
+                    <DialogTrigger asChild>
+                      <Button>
+                        <UserPlus className="h-4 w-4 mr-2" />
+                        Ajouter un membre
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>Ajouter un nouveau membre</DialogTitle>
+                      </DialogHeader>
+                      <form onSubmit={handleAddMember} className="space-y-4">
+                        <div>
+                          <Label htmlFor="firstName">Prénom</Label>
+                          <Input id="firstName" name="firstName" required />
+                        </div>
+                        <div>
+                          <Label htmlFor="lastName">Nom</Label>
+                          <Input id="lastName" name="lastName" required />
+                        </div>
+                        <div>
+                          <Label htmlFor="email">Email</Label>
+                          <Input id="email" name="email" type="email" required />
+                        </div>
+                        <div>
+                          <Label htmlFor="password">Mot de passe</Label>
+                          <Input id="password" name="password" type="password" required />
+                        </div>
+                        <Button type="submit" className="w-full">
+                          Créer le membre
+                        </Button>
+                      </form>
+                    </DialogContent>
+                  </Dialog>
                 </div>
               </CardHeader>
               <CardContent>
