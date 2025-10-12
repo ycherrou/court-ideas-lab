@@ -5,7 +5,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { addDays } from "date-fns";
+import { addDays, format } from "date-fns";
 
 interface BookingModalProps {
   open: boolean;
@@ -30,12 +30,12 @@ export const BookingModal = ({ open, onOpenChange, userId, onSuccess }: BookingM
     setSelectedDate(date);
     
     // Check for active reservation
-    const dateStr = date.toISOString().split("T")[0];
+    const dateStr = format(date, "yyyy-MM-dd");
     const { data: activeRes } = await supabase
       .from("reservations")
       .select("*")
       .or(`player1_id.eq.${userId},player2_id.eq.${userId}`)
-      .gte("date", new Date().toISOString().split("T")[0]);
+      .gte("date", format(new Date(), "yyyy-MM-dd"));
 
     if (activeRes && activeRes.length > 0) {
       toast.error("Vous avez déjà une réservation active");
@@ -51,7 +51,7 @@ export const BookingModal = ({ open, onOpenChange, userId, onSuccess }: BookingM
     const dateToUse = date || selectedDate;
     if (!dateToUse) return;
 
-    const dateStr = dateToUse.toISOString().split("T")[0];
+    const dateStr = format(dateToUse, "yyyy-MM-dd");
     const [courtsData, reservations, blocked, profiles] = await Promise.all([
       supabase.from("courts").select("*").order("court_number"),
       supabase.from("reservations").select("*").eq("date", dateStr),
@@ -78,7 +78,7 @@ export const BookingModal = ({ open, onOpenChange, userId, onSuccess }: BookingM
 
     setLoading(true);
     try {
-      const dateStr = selectedDate.toISOString().split("T")[0];
+      const dateStr = format(selectedDate, "yyyy-MM-dd");
       const [hourStr] = selectedTime.split(":");
       const hour = parseInt(hourStr);
       const endTime = `${(hour + 1).toString().padStart(2, "0")}:00:00`;
