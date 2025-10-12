@@ -29,7 +29,15 @@ interface BlockedSlot {
 
 const HOURS = Array.from({ length: 14 }, (_, i) => i + 7); // 7h to 20h
 
-export const ReservationGrid = ({ date, userId }: { date: Date; userId?: string }) => {
+export const ReservationGrid = ({ 
+  date, 
+  userId, 
+  onSlotClick 
+}: { 
+  date: Date; 
+  userId?: string;
+  onSlotClick?: (courtId: string, courtName: string, hour: number) => void;
+}) => {
   const [courts, setCourts] = useState<Court[]>([]);
   const [reservations, setReservations] = useState<Reservation[]>([]);
   const [blockedSlots, setBlockedSlots] = useState<BlockedSlot[]>([]);
@@ -88,7 +96,7 @@ export const ReservationGrid = ({ date, userId }: { date: Date; userId?: string 
     }
   };
 
-  const getSlotContent = (courtId: string, hour: number) => {
+  const getSlotContent = (courtId: string, courtName: string, hour: number) => {
     const timeStr = `${hour.toString().padStart(2, "0")}:00:00`;
     const endTimeStr = `${(hour + 1).toString().padStart(2, "0")}:00:00`;
 
@@ -138,10 +146,17 @@ export const ReservationGrid = ({ date, userId }: { date: Date; userId?: string 
       );
     }
 
+    // Available slot - clickable
     return (
-      <div className="h-full bg-success/10 border-success/40 flex items-center justify-center text-xs text-muted-foreground">
-        Disponible
-      </div>
+      <button
+        onClick={() => onSlotClick?.(courtId, courtName, hour)}
+        className="h-full w-full bg-success/10 hover:bg-success/20 active:bg-success/30 border-success/40 flex items-center justify-center text-xs text-muted-foreground transition-colors cursor-pointer"
+      >
+        <div className="flex flex-col items-center gap-1">
+          <span className="hidden md:block">Disponible</span>
+          <span className="text-[10px] md:hidden">✓</span>
+        </div>
+      </button>
     );
   };
 
@@ -166,8 +181,8 @@ export const ReservationGrid = ({ date, userId }: { date: Date; userId?: string 
                 {hour}h
               </div>
               {courts.map((court) => (
-                <Card key={`${court.id}-${hour}`} className="min-h-[60px] md:min-h-[80px]">
-                  {getSlotContent(court.id, hour)}
+                <Card key={`${court.id}-${hour}`} className="min-h-[60px] md:min-h-[80px] overflow-hidden">
+                  {getSlotContent(court.id, court.name, hour)}
                 </Card>
               ))}
             </>

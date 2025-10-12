@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
@@ -13,9 +13,20 @@ interface BookingModalProps {
   onOpenChange: (open: boolean) => void;
   userId: string;
   onSuccess: () => void;
+  prefilledDate?: Date;
+  prefilledCourtId?: string;
+  prefilledTime?: string;
 }
 
-export const BookingModal = ({ open, onOpenChange, userId, onSuccess }: BookingModalProps) => {
+export const BookingModal = ({ 
+  open, 
+  onOpenChange, 
+  userId, 
+  onSuccess,
+  prefilledDate,
+  prefilledCourtId,
+  prefilledTime
+}: BookingModalProps) => {
   const [step, setStep] = useState(1);
   const [selectedDate, setSelectedDate] = useState<Date>();
   const [selectedCourt, setSelectedCourt] = useState("");
@@ -27,6 +38,17 @@ export const BookingModal = ({ open, onOpenChange, userId, onSuccess }: BookingM
   const [availableSlots, setAvailableSlots] = useState<string[]>([]);
   const [reservationsData, setReservationsData] = useState<any[]>([]);
   const [blockedSlotsData, setBlockedSlotsData] = useState<any[]>([]);
+
+  // Initialize with prefilled data if provided
+  useEffect(() => {
+    if (open && prefilledDate && prefilledCourtId && prefilledTime) {
+      setSelectedDate(prefilledDate);
+      setSelectedCourt(prefilledCourtId);
+      setSelectedTime(prefilledTime);
+      handleSlotSelect(prefilledDate);
+      setStep(2); // Skip to partner selection
+    }
+  }, [open, prefilledDate, prefilledCourtId, prefilledTime]);
 
   // Filter slots based on selected court
   const getFilteredSlots = () => {

@@ -15,6 +15,28 @@ const Index = () => {
   const { isAdmin, loading: roleLoading } = useUserRole(user?.id);
   const [bookingOpen, setBookingOpen] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [prefilledBooking, setPrefilledBooking] = useState<{
+    date: Date;
+    courtId: string;
+    time: string;
+  } | null>(null);
+
+  const handleSlotClick = (courtId: string, courtName: string, hour: number) => {
+    const timeStr = `${hour.toString().padStart(2, "0")}:00:00`;
+    setPrefilledBooking({
+      date: new Date(),
+      courtId,
+      time: timeStr,
+    });
+    setBookingOpen(true);
+  };
+
+  const handleBookingClose = (open: boolean) => {
+    setBookingOpen(open);
+    if (!open) {
+      setPrefilledBooking(null);
+    }
+  };
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -100,7 +122,12 @@ const Index = () => {
           </h2>
         </div>
 
-        <ReservationGrid key={refreshKey} date={new Date()} userId={user.id} />
+        <ReservationGrid 
+          key={refreshKey} 
+          date={new Date()} 
+          userId={user.id} 
+          onSlotClick={handleSlotClick}
+        />
       </main>
 
       {/* Mobile Navigation */}
@@ -108,9 +135,12 @@ const Index = () => {
 
       <BookingModal
         open={bookingOpen}
-        onOpenChange={setBookingOpen}
+        onOpenChange={handleBookingClose}
         userId={user.id}
         onSuccess={() => setRefreshKey((k) => k + 1)}
+        prefilledDate={prefilledBooking?.date}
+        prefilledCourtId={prefilledBooking?.courtId}
+        prefilledTime={prefilledBooking?.time}
       />
     </div>
   );
