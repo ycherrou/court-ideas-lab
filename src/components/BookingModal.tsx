@@ -6,6 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { addDays, format } from "date-fns";
+import { PartnerSelector } from "./PartnerSelector";
 
 interface BookingModalProps {
   open: boolean;
@@ -237,18 +238,12 @@ export const BookingModal = ({ open, onOpenChange, userId, onSuccess }: BookingM
 
             <div>
               <label className="text-sm font-medium">Partenaire</label>
-              <Select value={selectedPartner} onValueChange={setSelectedPartner}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Sélectionnez un partenaire" />
-                </SelectTrigger>
-                <SelectContent>
-                  {partners.map((partner) => (
-                    <SelectItem key={partner.id} value={partner.id}>
-                      {partner.first_name} {partner.last_name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <PartnerSelector
+                userId={userId}
+                selectedDate={selectedDate!}
+                value={selectedPartner}
+                onValueChange={setSelectedPartner}
+              />
             </div>
 
             <div className="flex gap-2">

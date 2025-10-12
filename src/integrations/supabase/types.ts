@@ -79,6 +79,27 @@ export type Database = {
         }
         Relationships: []
       }
+      favorite_partners: {
+        Row: {
+          created_at: string
+          favorite_user_id: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          favorite_user_id: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          favorite_user_id?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           created_at: string
