@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
+import { useUserRole } from "@/hooks/useUserRole";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -13,6 +14,7 @@ import { MobileNav } from "@/components/MobileNav";
 const MyReservations = () => {
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
+  const { isAdmin, loading: roleLoading } = useUserRole(user?.id);
   const [activeReservations, setActiveReservations] = useState<any[]>([]);
   const [pastReservations, setPastReservations] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -33,15 +35,21 @@ const MyReservations = () => {
     if (!user) return;
 
     try {
-      const { data } = await supabase
+      let query = supabase
         .from("reservations")
         .select(`
           *,
           court:courts(name),
           player1:player1_id(first_name, last_name),
           player2:player2_id(first_name, last_name)
-        `)
-        .or(`player1_id.eq.${user.id},player2_id.eq.${user.id}`)
+        `);
+
+      // Si l'utilisateur n'est pas admin, filtrer par ses réservations
+      if (!isAdmin) {
+        query = query.or(`player1_id.eq.${user.id},player2_id.eq.${user.id}`);
+      }
+
+      const { data } = await query
         .order("date", { ascending: false })
         .order("start_time", { ascending: false });
 
@@ -85,7 +93,7 @@ const MyReservations = () => {
     }
   };
 
-  if (authLoading || loading) {
+  if (authLoading || roleLoading || loading) {
     return (
       <div className="min-h-screen p-8">
         <Skeleton className="h-12 w-64 mb-8" />
@@ -105,7 +113,7 @@ const MyReservations = () => {
             <ArrowLeft className="h-4 w-4 mr-2" />
             Retour
           </Button>
-          <h1 className="text-2xl font-bold">Mes réservations</h1>
+          <h1 className="text-2xl font-bold">{isAdmin ? "Toutes les réservations" : "Mes réservations"}</h1>
         </div>
       </header>
 
@@ -115,7 +123,7 @@ const MyReservations = () => {
           <Button variant="ghost" size="icon" onClick={() => navigate("/")}>
             <ArrowLeft className="h-5 w-5" />
           </Button>
-          <h1 className="text-lg font-bold">Mes réservations</h1>
+          <h1 className="text-lg font-bold">{isAdmin ? "Toutes les réservations" : "Mes réservations"}</h1>
         </div>
       </header>
 
@@ -151,9 +159,12 @@ const MyReservations = () => {
                         {res.start_time.slice(0, 5)} - {res.end_time.slice(0, 5)} • {res.court?.name}
                       </p>
                       <p className="text-sm">
-                        Avec {res.player1?.id === user.id 
-                          ? `${res.player2?.first_name} ${res.player2?.last_name}`
-                          : `${res.player1?.first_name} ${res.player1?.last_name}`
+                        {isAdmin 
+                          ? `${res.player1?.first_name} ${res.player1?.last_name} vs ${res.player2?.first_name} ${res.player2?.last_name}`
+                          : `Avec ${res.player1?.id === user.id 
+                              ? `${res.player2?.first_name} ${res.player2?.last_name}`
+                              : `${res.player1?.first_name} ${res.player1?.last_name}`
+                            }`
                         }
                       </p>
                     </div>
@@ -230,9 +241,12 @@ const MyReservations = () => {
                         {res.start_time.slice(0, 5)} - {res.end_time.slice(0, 5)} • {res.court?.name}
                       </p>
                       <p className="text-sm">
-                        Avec {res.player1?.id === user.id 
-                          ? `${res.player2?.first_name} ${res.player2?.last_name}`
-                          : `${res.player1?.first_name} ${res.player1?.last_name}`
+                        {isAdmin 
+                          ? `${res.player1?.first_name} ${res.player1?.last_name} vs ${res.player2?.first_name} ${res.player2?.last_name}`
+                          : `Avec ${res.player1?.id === user.id 
+                              ? `${res.player2?.first_name} ${res.player2?.last_name}`
+                              : `${res.player1?.first_name} ${res.player1?.last_name}`
+                            }`
                         }
                       </p>
                     </div>
