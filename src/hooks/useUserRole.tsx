@@ -7,8 +7,9 @@ export const useUserRole = (userId: string | undefined) => {
 
   useEffect(() => {
     if (!userId) {
+      // Pas d'utilisateur encore disponible: rester en chargement pour éviter des redirections prématurées
       setIsAdmin(false);
-      setLoading(false);
+      setLoading(true);
       return;
     }
 
