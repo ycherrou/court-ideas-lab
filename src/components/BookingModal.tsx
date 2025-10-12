@@ -25,6 +25,13 @@ export const BookingModal = ({ open, onOpenChange, userId, onSuccess }: BookingM
   const [courts, setCourts] = useState<any[]>([]);
   const [availableSlots, setAvailableSlots] = useState<string[]>([]);
 
+  // Reload slots when court changes
+  const handleCourtChange = async (courtId: string) => {
+    setSelectedCourt(courtId);
+    setSelectedTime(""); // Reset time when court changes
+    await handleSlotSelect(); // Reload slots for new court
+  };
+
   const handleDateSelect = async (date: Date | undefined) => {
     if (!date) return;
     setSelectedDate(date);
@@ -62,12 +69,33 @@ export const BookingModal = ({ open, onOpenChange, userId, onSuccess }: BookingM
     if (courtsData.data) setCourts(courtsData.data);
     if (profiles.data) setPartners(profiles.data);
 
-    // Generate available time slots (7h to 20h)
-    const slots = [];
+    // Generate all time slots (7h to 20h)
+    const allSlots = [];
     for (let hour = 7; hour < 21; hour++) {
-      slots.push(`${hour.toString().padStart(2, "0")}:00:00`);
+      allSlots.push(`${hour.toString().padStart(2, "0")}:00:00`);
     }
-    setAvailableSlots(slots);
+
+    // Filter out blocked and reserved slots for the selected court
+    const filteredSlots = allSlots.filter((slot) => {
+      if (!selectedCourt) return true;
+
+      // Check if blocked
+      const isBlocked = blocked.data?.some(
+        (b) =>
+          b.court_id === selectedCourt &&
+          slot >= b.start_time &&
+          slot < b.end_time
+      );
+
+      // Check if reserved
+      const isReserved = reservations.data?.some(
+        (r) => r.court_id === selectedCourt && r.start_time === slot
+      );
+
+      return !isBlocked && !isReserved;
+    });
+
+    setAvailableSlots(filteredSlots);
   };
 
   const handleConfirm = async () => {
@@ -172,7 +200,7 @@ export const BookingModal = ({ open, onOpenChange, userId, onSuccess }: BookingM
           <div className="space-y-4">
             <div>
               <label className="text-sm font-medium">Terrain</label>
-              <Select value={selectedCourt} onValueChange={setSelectedCourt}>
+              <Select value={selectedCourt} onValueChange={handleCourtChange}>
                 <SelectTrigger>
                   <SelectValue placeholder="Sélectionnez un terrain" />
                 </SelectTrigger>
