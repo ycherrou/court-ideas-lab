@@ -7,6 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { addDays, format } from "date-fns";
 import { PartnerSelector } from "./PartnerSelector";
+import { useUserRole } from "@/hooks/useUserRole";
 
 interface BookingModalProps {
   open: boolean;
@@ -32,12 +33,15 @@ export const BookingModal = ({
   const [selectedCourt, setSelectedCourt] = useState("");
   const [selectedTime, setSelectedTime] = useState("");
   const [selectedPartner, setSelectedPartner] = useState("");
+  const [selectedPlayer1, setSelectedPlayer1] = useState("");
+  const [selectedPlayer2, setSelectedPlayer2] = useState("");
   const [loading, setLoading] = useState(false);
   const [partners, setPartners] = useState<any[]>([]);
   const [courts, setCourts] = useState<any[]>([]);
   const [availableSlots, setAvailableSlots] = useState<string[]>([]);
   const [reservationsData, setReservationsData] = useState<any[]>([]);
   const [blockedSlotsData, setBlockedSlotsData] = useState<any[]>([]);
+  const { isAdmin } = useUserRole(userId);
 
   // Initialize with prefilled data if provided
   useEffect(() => {
@@ -124,8 +128,18 @@ export const BookingModal = ({
   };
 
   const handleConfirm = async () => {
-    if (!selectedDate || !selectedCourt || !selectedTime || !selectedPartner) {
+    if (!selectedDate || !selectedCourt || !selectedTime) {
       toast.error("Veuillez remplir tous les champs");
+      return;
+    }
+
+    if (isAdmin && (!selectedPlayer1 || !selectedPlayer2)) {
+      toast.error("Veuillez sélectionner les deux joueurs");
+      return;
+    }
+
+    if (!isAdmin && !selectedPartner) {
+      toast.error("Veuillez sélectionner un partenaire");
       return;
     }
 
@@ -170,8 +184,8 @@ export const BookingModal = ({
         date: dateStr,
         start_time: selectedTime,
         end_time: endTime,
-        player1_id: userId,
-        player2_id: selectedPartner,
+        player1_id: isAdmin ? selectedPlayer1 : userId,
+        player2_id: isAdmin ? selectedPlayer2 : selectedPartner,
         created_by: userId,
       });
 
@@ -196,6 +210,8 @@ export const BookingModal = ({
     setSelectedCourt("");
     setSelectedTime("");
     setSelectedPartner("");
+    setSelectedPlayer1("");
+    setSelectedPlayer2("");
   };
 
   return (
@@ -261,15 +277,39 @@ export const BookingModal = ({
               </Select>
             </div>
 
-            <div className="space-y-2">
-              <label className="text-sm font-medium block">Partenaire</label>
-              <PartnerSelector
-                userId={userId}
-                selectedDate={selectedDate!}
-                value={selectedPartner}
-                onValueChange={setSelectedPartner}
-              />
-            </div>
+            {isAdmin ? (
+              <>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium block">Joueur 1</label>
+                  <PartnerSelector
+                    userId={userId}
+                    selectedDate={selectedDate!}
+                    value={selectedPlayer1}
+                    onValueChange={setSelectedPlayer1}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-medium block">Joueur 2</label>
+                  <PartnerSelector
+                    userId={userId}
+                    selectedDate={selectedDate!}
+                    value={selectedPlayer2}
+                    onValueChange={setSelectedPlayer2}
+                  />
+                </div>
+              </>
+            ) : (
+              <div className="space-y-2">
+                <label className="text-sm font-medium block">Partenaire</label>
+                <PartnerSelector
+                  userId={userId}
+                  selectedDate={selectedDate!}
+                  value={selectedPartner}
+                  onValueChange={setSelectedPartner}
+                />
+              </div>
+            )}
 
             <div className="flex gap-3 pt-4">
               <Button variant="outline" onClick={() => setStep(1)} className="h-12 flex-1">

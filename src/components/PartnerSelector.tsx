@@ -63,11 +63,20 @@ export function PartnerSelector({
     const favIds = new Set(favData?.map((f) => f.favorite_user_id) || []);
     setFavoriteIds(favIds);
 
-    // Load all partners except current user
+    // Get admin user IDs
+    const { data: adminRoles } = await supabase
+      .from("user_roles")
+      .select("user_id")
+      .eq("role", "admin");
+
+    const adminIds = adminRoles?.map((r) => r.user_id) || [];
+
+    // Load all partners except current user and admins
     const { data: profiles } = await supabase
       .from("profiles")
       .select("*")
       .neq("id", userId)
+      .not("id", "in", `(${adminIds.join(",")})`)
       .order("first_name");
 
     if (profiles) {
