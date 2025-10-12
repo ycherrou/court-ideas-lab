@@ -137,8 +137,9 @@ const Index = () => {
           setApi={setApi}
           className="w-full"
           opts={{
-            align: "start",
+            align: "center",
             loop: false,
+            dragFree: false,
           }}
         >
           <div className="flex items-center justify-between mb-4">
