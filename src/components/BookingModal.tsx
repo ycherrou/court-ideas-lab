@@ -42,13 +42,16 @@ export const BookingModal = ({ open, onOpenChange, userId, onSuccess }: BookingM
       return;
     }
 
+    // Load data for step 2
+    await handleSlotSelect(date);
     setStep(2);
   };
 
-  const handleSlotSelect = async () => {
-    if (!selectedDate) return;
+  const handleSlotSelect = async (date?: Date) => {
+    const dateToUse = date || selectedDate;
+    if (!dateToUse) return;
 
-    const dateStr = selectedDate.toISOString().split("T")[0];
+    const dateStr = dateToUse.toISOString().split("T")[0];
     const [courtsData, reservations, blocked, profiles] = await Promise.all([
       supabase.from("courts").select("*").order("court_number"),
       supabase.from("reservations").select("*").eq("date", dateStr),
@@ -124,7 +127,11 @@ export const BookingModal = ({ open, onOpenChange, userId, onSuccess }: BookingM
               mode="single"
               selected={selectedDate}
               onSelect={handleDateSelect}
-              disabled={(date) => date < new Date() || date > addDays(new Date(), 7)}
+              disabled={(date) => {
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+                return date < today || date > addDays(new Date(), 7);
+              }}
               className="pointer-events-auto"
             />
           </div>
