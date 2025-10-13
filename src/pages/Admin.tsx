@@ -16,7 +16,6 @@ import { toast } from "sonner";
 import { ArrowLeft, UserPlus, Trash2, Calendar, Ban } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { z } from "zod";
-import rtcLogo from "@/assets/rtc-logo.png";
 
 const newMemberSchema = z.object({
   firstName: z.string().min(2, "Le prénom doit contenir au moins 2 caractères"),
