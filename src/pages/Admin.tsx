@@ -118,17 +118,26 @@ const Admin = () => {
     try {
       newMemberSchema.parse(data);
 
-      const { error } = await supabase.auth.admin.createUser({
-        email: data.email,
-        password: data.password,
-        email_confirm: true,
-        user_metadata: {
-          first_name: data.firstName,
-          last_name: data.lastName,
-        },
-      });
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error("Non connecté");
 
-      if (error) throw error;
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-member`,
+        {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${session.access_token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(data),
+        }
+      );
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || "Erreur lors de la création");
+      }
 
       toast.success("Membre ajouté avec succès");
       setAddMemberOpen(false);
