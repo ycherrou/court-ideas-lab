@@ -10,7 +10,6 @@ import { toast } from "sonner";
 import { ArrowLeft, Trash2 } from "lucide-react";
 import { MobileReservationCard } from "@/components/MobileReservationCard";
 import { MobileNav } from "@/components/MobileNav";
-import rtcLogo from "@/assets/rtc-logo.png";
 
 const MyReservations = () => {
   const navigate = useNavigate();
@@ -27,9 +26,10 @@ const MyReservations = () => {
   }, [user, authLoading, navigate]);
 
   useEffect(() => {
-    if (!user || roleLoading) return;
-    fetchReservations();
-  }, [user, isAdmin, roleLoading]);
+    if (user) {
+      fetchReservations();
+    }
+  }, [user]);
 
   const fetchReservations = async () => {
     if (!user) return;
@@ -113,7 +113,6 @@ const MyReservations = () => {
             <ArrowLeft className="h-4 w-4 mr-2" />
             Retour
           </Button>
-          <img src={rtcLogo} alt="Royal Tennis Club" className="h-10 w-auto" />
           <h1 className="text-2xl font-bold">{isAdmin ? "Toutes les réservations" : "Mes réservations"}</h1>
         </div>
       </header>
@@ -124,8 +123,7 @@ const MyReservations = () => {
           <Button variant="ghost" size="icon" onClick={() => navigate("/")}>
             <ArrowLeft className="h-5 w-5" />
           </Button>
-          <img src={rtcLogo} alt="Royal Tennis Club" className="h-8 w-auto" />
-          <h1 className="text-base font-bold flex-1">{isAdmin ? "Toutes les résa" : "Mes résa"}</h1>
+          <h1 className="text-lg font-bold">{isAdmin ? "Toutes les réservations" : "Mes réservations"}</h1>
         </div>
       </header>
 
