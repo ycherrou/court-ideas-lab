@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "./ui/button";
 import { useUserRole } from "@/hooks/useUserRole";
 import { useAuth } from "@/hooks/useAuth";
+import { useCoachRestrictions } from "@/hooks/useCoachRestrictions";
 
 interface MobileNavProps {
   userId?: string;
@@ -14,6 +15,7 @@ export function MobileNav({ userId, onBookingOpen }: MobileNavProps) {
   const navigate = useNavigate();
   const { isAdmin } = useUserRole(userId);
   const { signOut } = useAuth();
+  const { isCoach } = useCoachRestrictions(userId);
   const [menuOpen, setMenuOpen] = useState(false);
 
   return (
@@ -28,13 +30,15 @@ export function MobileNav({ userId, onBookingOpen }: MobileNavProps) {
             <Home className="h-5 w-5" />
             <span>Accueil</span>
           </button>
-          <button
-            onClick={onBookingOpen}
-            className="flex flex-col items-center justify-center gap-1 text-xs bg-primary text-primary-foreground hover:bg-primary/90 active:bg-primary/80"
-          >
-            <Calendar className="h-5 w-5" />
-            <span>Réserver</span>
-          </button>
+          {!isCoach && (
+            <button
+              onClick={onBookingOpen}
+              className="flex flex-col items-center justify-center gap-1 text-xs bg-primary text-primary-foreground hover:bg-primary/90 active:bg-primary/80"
+            >
+              <Calendar className="h-5 w-5" />
+              <span>Réserver</span>
+            </button>
+          )}
           <button
             onClick={() => navigate("/mes-reservations")}
             className="flex flex-col items-center justify-center gap-1 text-xs hover:bg-accent active:bg-accent"

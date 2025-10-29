@@ -53,7 +53,10 @@ const Admin = () => {
   const fetchData = async () => {
     try {
       const [membersData, reservationsData, blockedData, courtsData] = await Promise.all([
-        supabase.from("profiles").select("*").order("created_at", { ascending: false }),
+        supabase.from("profiles").select(`
+          *,
+          user_roles(role)
+        `).order("created_at", { ascending: false }),
         supabase
           .from("reservations")
           .select(`
@@ -113,6 +116,7 @@ const Admin = () => {
       lastName: formData.get("lastName") as string,
       email: formData.get("email") as string,
       password: formData.get("password") as string,
+      role: formData.get("role") as string,
     };
 
     try {
@@ -246,6 +250,20 @@ const Admin = () => {
                           <Label htmlFor="password">Mot de passe</Label>
                           <Input id="password" name="password" type="password" required />
                         </div>
+                        <div>
+                          <Label htmlFor="role">Rôle</Label>
+                          <Select name="role" required>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Sélectionnez un rôle" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="player">Joueur</SelectItem>
+                              <SelectItem value="coach">Coach</SelectItem>
+                              <SelectItem value="super_coach">Super Coach</SelectItem>
+                              <SelectItem value="admin">Administrateur</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
                         <Button type="submit" className="w-full">
                           Créer le membre
                         </Button>
@@ -260,6 +278,7 @@ const Admin = () => {
                     <TableRow>
                       <TableHead>Nom</TableHead>
                       <TableHead>Email</TableHead>
+                      <TableHead>Rôle</TableHead>
                       <TableHead>Date d'inscription</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -270,6 +289,11 @@ const Admin = () => {
                           {member.first_name} {member.last_name}
                         </TableCell>
                         <TableCell>{member.email}</TableCell>
+                        <TableCell>
+                          {member.user_roles?.[0]?.role || 'player'}
+                          {member.user_roles?.[0]?.role === 'coach' && ' 🎾'}
+                          {member.user_roles?.[0]?.role === 'super_coach' && ' ⭐🎾'}
+                        </TableCell>
                         <TableCell>
                           {new Date(member.created_at).toLocaleDateString("fr-FR")}
                         </TableCell>

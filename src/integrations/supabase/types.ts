@@ -212,9 +212,13 @@ export type Database = {
         }
         Returns: boolean
       }
+      is_court_allowed_for_user: {
+        Args: { _court_id: string; _user_id: string }
+        Returns: boolean
+      }
     }
     Enums: {
-      app_role: "admin" | "player"
+      app_role: "admin" | "player" | "coach" | "super_coach"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -342,7 +346,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["admin", "player"],
+      app_role: ["admin", "player", "coach", "super_coach"],
     },
   },
 } as const

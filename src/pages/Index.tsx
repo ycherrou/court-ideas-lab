@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserRole } from "@/hooks/useUserRole";
+import { useCoachRestrictions } from "@/hooks/useCoachRestrictions";
 import { ReservationGrid } from "@/components/ReservationGrid";
 import { BookingModal } from "@/components/BookingModal";
 import { Button } from "@/components/ui/button";
@@ -16,6 +17,7 @@ const Index = () => {
   const navigate = useNavigate();
   const { user, loading: authLoading, signOut } = useAuth();
   const { isAdmin, loading: roleLoading } = useUserRole(user?.id);
+  const { isCoach } = useCoachRestrictions(user?.id);
   const [bookingOpen, setBookingOpen] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
   const [prefilledBooking, setPrefilledBooking] = useState<{
@@ -130,10 +132,12 @@ const Index = () => {
           <h2 className="text-xl font-semibold">
             Réservations de la semaine
           </h2>
-          <Button onClick={() => setBookingOpen(true)}>
-            <Calendar className="h-4 w-4 mr-2" />
-            Réserver un terrain
-          </Button>
+          {!isCoach && (
+            <Button onClick={() => setBookingOpen(true)}>
+              <Calendar className="h-4 w-4 mr-2" />
+              Réserver un terrain
+            </Button>
+          )}
         </div>
 
         {/* Mobile Title */}

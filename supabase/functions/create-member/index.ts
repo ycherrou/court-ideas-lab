@@ -47,7 +47,16 @@ Deno.serve(async (req) => {
       })
     }
 
-    const { email, password, firstName, lastName } = await req.json()
+    const { email, password, firstName, lastName, role } = await req.json()
+
+    // Valider le rôle
+    const validRoles = ['player', 'admin', 'coach', 'super_coach']
+    if (role && !validRoles.includes(role)) {
+      return new Response(JSON.stringify({ error: 'Invalid role' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      })
+    }
 
     // Create user with admin client
     const { data, error } = await supabaseAdmin.auth.admin.createUser({
@@ -65,6 +74,20 @@ Deno.serve(async (req) => {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       })
+    }
+
+    // Assigner le rôle si spécifié
+    if (role && data.user) {
+      const { error: roleError } = await supabaseAdmin
+        .from('user_roles')
+        .insert({
+          user_id: data.user.id,
+          role: role
+        })
+
+      if (roleError) {
+        console.error('Error assigning role:', roleError)
+      }
     }
 
     return new Response(JSON.stringify({ data }), {

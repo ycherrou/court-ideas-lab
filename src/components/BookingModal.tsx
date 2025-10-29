@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { addDays, format } from "date-fns";
 import { PartnerSelector } from "./PartnerSelector";
 import { useUserRole } from "@/hooks/useUserRole";
+import { useCoachRestrictions } from "@/hooks/useCoachRestrictions";
 
 interface BookingModalProps {
   open: boolean;
@@ -41,7 +42,49 @@ export const BookingModal = ({
   const [availableSlots, setAvailableSlots] = useState<string[]>([]);
   const [reservationsData, setReservationsData] = useState<any[]>([]);
   const [blockedSlotsData, setBlockedSlotsData] = useState<any[]>([]);
+  const [partnerRestrictions, setPartnerRestrictions] = useState<string[]>([]);
   const { isAdmin } = useUserRole(userId);
+  const { isCoach: currentUserIsCoach } = useCoachRestrictions(userId);
+
+  // Empêcher l'ouverture si l'utilisateur est un coach
+  useEffect(() => {
+    if (open && currentUserIsCoach && !isAdmin) {
+      toast.error("Les coachs ne peuvent pas créer de réservations");
+      onOpenChange(false);
+    }
+  }, [open, currentUserIsCoach, isAdmin, onOpenChange]);
+
+  // Charger les restrictions du partenaire sélectionné
+  useEffect(() => {
+    const checkPartnerRestrictions = async () => {
+      const partnerId = isAdmin ? (selectedPlayer1 || selectedPlayer2) : selectedPartner;
+      if (!partnerId) {
+        setPartnerRestrictions([]);
+        return;
+      }
+
+      const { data: roles } = await supabase
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", partnerId)
+        .in("role", ["coach", "super_coach"])
+        .maybeSingle();
+
+      if (roles?.role === "coach") {
+        // Coach normal : restreindre aux terrains 6,7,8,9,central
+        const { data: courts } = await supabase
+          .from("courts")
+          .select("id")
+          .or("court_number.in.(6,7,8,9),is_central.eq.true");
+
+        setPartnerRestrictions(courts?.map((c) => c.id) || []);
+      } else {
+        setPartnerRestrictions([]); // Pas de restriction
+      }
+    };
+
+    checkPartnerRestrictions();
+  }, [selectedPartner, selectedPlayer1, selectedPlayer2, isAdmin]);
 
   // Initialize with prefilled data if provided
   useEffect(() => {
@@ -91,17 +134,19 @@ export const BookingModal = ({
     if (!date) return;
     setSelectedDate(date);
     
-    // Check for active reservation
-    const dateStr = format(date, "yyyy-MM-dd");
-    const { data: activeRes } = await supabase
-      .from("reservations")
-      .select("*")
-      .or(`player1_id.eq.${userId},player2_id.eq.${userId}`)
-      .gte("date", format(new Date(), "yyyy-MM-dd"));
+    // Check for active reservation (pas pour les admins créant pour les coachs)
+    if (!isAdmin) {
+      const dateStr = format(date, "yyyy-MM-dd");
+      const { data: activeRes } = await supabase
+        .from("reservations")
+        .select("*")
+        .or(`player1_id.eq.${userId},player2_id.eq.${userId}`)
+        .gte("date", format(new Date(), "yyyy-MM-dd"));
 
-    if (activeRes && activeRes.length > 0) {
-      toast.error("Vous avez déjà une réservation active");
-      return;
+      if (activeRes && activeRes.length > 0) {
+        toast.error("Vous avez déjà une réservation active");
+        return;
+      }
     }
 
     // Load data for step 2
@@ -249,11 +294,16 @@ export const BookingModal = ({
                   <SelectValue placeholder="Sélectionnez un terrain" />
                 </SelectTrigger>
                 <SelectContent>
-                  {courts.map((court) => (
-                    <SelectItem key={court.id} value={court.id} className="py-3">
-                      {court.name}
-                    </SelectItem>
-                  ))}
+                  {courts
+                    .filter((court) => 
+                      partnerRestrictions.length === 0 || 
+                      partnerRestrictions.includes(court.id)
+                    )
+                    .map((court) => (
+                      <SelectItem key={court.id} value={court.id} className="py-3">
+                        {court.name}
+                      </SelectItem>
+                    ))}
                 </SelectContent>
               </Select>
             </div>

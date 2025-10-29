@@ -44,6 +44,7 @@ export function PartnerSelector({
   const [recents, setRecents] = useState<Partner[]>([]);
   const [allPartners, setAllPartners] = useState<Partner[]>([]);
   const [favoriteIds, setFavoriteIds] = useState<Set<string>>(new Set());
+  const [coachRoles, setCoachRoles] = useState<Map<string, string>>(new Map());
   const { toast } = useToast();
 
   // Load data when modal opens
@@ -71,7 +72,17 @@ export function PartnerSelector({
 
     const adminIds = adminRoles?.map((r) => r.user_id) || [];
 
-    // Load all partners except current user and admins
+    // Load coach roles
+    const { data: coachRolesData } = await supabase
+      .from("user_roles")
+      .select("user_id, role")
+      .in("role", ["coach", "super_coach"]);
+
+    const coachMap = new Map<string, string>();
+    coachRolesData?.forEach((r) => coachMap.set(r.user_id, r.role));
+    setCoachRoles(coachMap);
+
+    // Load all partners except current user and admins (include coaches)
     const { data: profiles } = await supabase
       .from("profiles")
       .select("*")
@@ -204,6 +215,8 @@ export function PartnerSelector({
                   >
                     <span className={cn(value === partner.id && "font-medium")}>
                       {partner.first_name} {partner.last_name}
+                      {coachRoles.get(partner.id) === 'coach' && ' 🎾'}
+                      {coachRoles.get(partner.id) === 'super_coach' && ' ⭐🎾'}
                     </span>
                     <Star
                       className="h-4 w-4 cursor-pointer fill-yellow-400 text-yellow-400"
@@ -234,6 +247,8 @@ export function PartnerSelector({
                     >
                       <span className={cn(value === partner.id && "font-medium")}>
                         {partner.first_name} {partner.last_name}
+                        {coachRoles.get(partner.id) === 'coach' && ' 🎾'}
+                        {coachRoles.get(partner.id) === 'super_coach' && ' ⭐🎾'}
                       </span>
                       <Star
                         className="h-4 w-4 cursor-pointer text-muted-foreground hover:text-yellow-400"
@@ -264,6 +279,8 @@ export function PartnerSelector({
                   >
                     <span className={cn(value === partner.id && "font-medium")}>
                       {partner.first_name} {partner.last_name}
+                      {coachRoles.get(partner.id) === 'coach' && ' 🎾'}
+                      {coachRoles.get(partner.id) === 'super_coach' && ' ⭐🎾'}
                     </span>
                     <Star
                       className="h-4 w-4 cursor-pointer text-muted-foreground hover:text-yellow-400"
