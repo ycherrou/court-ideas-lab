@@ -53,10 +53,7 @@ const Admin = () => {
   const fetchData = async () => {
     try {
       const [membersData, reservationsData, blockedData, courtsData] = await Promise.all([
-        supabase.from("profiles").select(`
-          *,
-          user_roles!user_roles_user_id_fkey(role)
-        `).order("created_at", { ascending: false }),
+        supabase.from("profiles").select("*").order("created_at", { ascending: false }),
         supabase
           .from("reservations")
           .select(`
@@ -72,7 +69,22 @@ const Admin = () => {
         supabase.from("courts").select("*").order("court_number"),
       ]);
 
-      if (membersData.data) setMembers(membersData.data);
+      // Charger les membres avec leurs rôles séparément
+      if (membersData.data) {
+        const memberIds = membersData.data.map(m => m.id);
+        const { data: roles } = await supabase
+          .from("user_roles")
+          .select("user_id, role")
+          .in("user_id", memberIds);
+
+        const membersWithRoles = membersData.data.map(member => ({
+          ...member,
+          user_roles: roles?.filter(r => r.user_id === member.id) || []
+        }));
+
+        setMembers(membersWithRoles);
+      }
+      
       if (reservationsData.data) setReservations(reservationsData.data as any);
       if (blockedData.data) setBlockedSlots(blockedData.data as any);
       if (courtsData.data) setCourts(courtsData.data);
