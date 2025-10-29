@@ -55,7 +55,7 @@ const Admin = () => {
       const [membersData, reservationsData, blockedData, courtsData] = await Promise.all([
         supabase.from("profiles").select(`
           *,
-          user_roles(role)
+          user_roles!user_roles_user_id_fkey(role)
         `).order("created_at", { ascending: false }),
         supabase
           .from("reservations")
