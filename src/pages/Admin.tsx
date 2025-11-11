@@ -89,11 +89,11 @@ const Admin = () => {
       if (reservationsData.data) {
         const now = new Date();
         const currentDate = now.toISOString().split("T")[0];
-        const currentTime = now.toTimeString().slice(0, 8);
+        const currentTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}:00`;
         
         const futureReservations = reservationsData.data.filter((res: any) => {
           if (res.date > currentDate) return true;
-          if (res.date === currentDate && res.start_time > currentTime) return true;
+          if (res.date === currentDate && res.start_time >= currentTime) return true;
           return false;
         });
         
