@@ -13,7 +13,8 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
-import { ArrowLeft, UserPlus, Trash2, Calendar, Ban } from "lucide-react";
+import { ArrowLeft, UserPlus, Trash2, Calendar, Ban, Edit, Search } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Skeleton } from "@/components/ui/skeleton";
 import { z } from "zod";
 
@@ -34,6 +35,10 @@ const Admin = () => {
   const [courts, setCourts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [addMemberOpen, setAddMemberOpen] = useState(false);
+  const [editMemberOpen, setEditMemberOpen] = useState(false);
+  const [selectedMember, setSelectedMember] = useState<any>(null);
+  const [selectedMembers, setSelectedMembers] = useState<Set<string>>(new Set());
+  const [searchQuery, setSearchQuery] = useState("");
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -181,6 +186,94 @@ const Admin = () => {
     }
   };
 
+  const handleEditMember = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const formData = new FormData(e.currentTarget);
+
+    const data = {
+      first_name: formData.get("firstName") as string,
+      last_name: formData.get("lastName") as string,
+      email: formData.get("email") as string,
+    };
+
+    const { error: profileError } = await supabase
+      .from("profiles")
+      .update(data)
+      .eq("id", selectedMember.id);
+
+    if (profileError) {
+      toast.error("Erreur lors de la modification");
+      return;
+    }
+
+    const newRole = formData.get("role") as string;
+    const currentRole = selectedMember.user_roles?.[0]?.role || "player";
+
+    if (newRole !== currentRole) {
+      // Supprimer l'ancien rôle
+      await supabase.from("user_roles").delete().eq("user_id", selectedMember.id);
+      
+      // Ajouter le nouveau rôle
+      const { error: roleError } = await supabase
+        .from("user_roles")
+        .insert([{ user_id: selectedMember.id, role: newRole as "admin" | "coach" | "player" | "super_coach" }]);
+
+      if (roleError) {
+        toast.error("Erreur lors de la modification du rôle");
+        return;
+      }
+    }
+
+    toast.success("Membre modifié avec succès");
+    setEditMemberOpen(false);
+    setSelectedMember(null);
+    fetchData();
+  };
+
+  const handleDeleteMember = async (memberId: string) => {
+    if (!confirm("Êtes-vous sûr de vouloir supprimer ce membre ?")) return;
+
+    const { error } = await supabase.auth.admin.deleteUser(memberId);
+
+    if (error) {
+      toast.error("Erreur lors de la suppression");
+    } else {
+      toast.success("Membre supprimé");
+      fetchData();
+    }
+  };
+
+  const handleDeleteSelectedMembers = async () => {
+    if (selectedMembers.size === 0) return;
+    if (!confirm(`Êtes-vous sûr de vouloir supprimer ${selectedMembers.size} membre(s) ?`)) return;
+
+    for (const memberId of selectedMembers) {
+      await supabase.auth.admin.deleteUser(memberId);
+    }
+
+    toast.success(`${selectedMembers.size} membre(s) supprimé(s)`);
+    setSelectedMembers(new Set());
+    fetchData();
+  };
+
+  const toggleMemberSelection = (memberId: string) => {
+    const newSelection = new Set(selectedMembers);
+    if (newSelection.has(memberId)) {
+      newSelection.delete(memberId);
+    } else {
+      newSelection.add(memberId);
+    }
+    setSelectedMembers(newSelection);
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedMembers.size === filteredMembers.length) {
+      setSelectedMembers(new Set());
+    } else {
+      setSelectedMembers(new Set(filteredMembers.map(m => m.id)));
+    }
+  };
+
   const handleCreateBlockedSlot = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
@@ -205,6 +298,11 @@ const Admin = () => {
       (e.target as HTMLFormElement).reset();
     }
   };
+
+  const filteredMembers = members.filter((member) => {
+    const fullName = `${member.first_name} ${member.last_name}`.toLowerCase();
+    return fullName.includes(searchQuery.toLowerCase());
+  });
 
   if (authLoading || roleLoading || loading) {
     return (
@@ -244,72 +342,108 @@ const Admin = () => {
                   <div>
                     <CardTitle>Gestion des membres</CardTitle>
                     <CardDescription>
-                      {members.length} membre{members.length > 1 ? "s" : ""} inscrit{members.length > 1 ? "s" : ""}
+                      {filteredMembers.length} membre{filteredMembers.length > 1 ? "s" : ""} 
+                      {searchQuery && ` (${members.length} total)`}
                     </CardDescription>
                   </div>
-                  <Dialog open={addMemberOpen} onOpenChange={setAddMemberOpen}>
-                    <DialogTrigger asChild>
-                      <Button>
-                        <UserPlus className="h-4 w-4 mr-2" />
-                        Ajouter un membre
+                  <div className="flex gap-2">
+                    {selectedMembers.size > 0 && (
+                      <Button 
+                        variant="destructive" 
+                        onClick={handleDeleteSelectedMembers}
+                      >
+                        <Trash2 className="h-4 w-4 mr-2" />
+                        Supprimer ({selectedMembers.size})
                       </Button>
-                    </DialogTrigger>
-                    <DialogContent>
-                      <DialogHeader>
-                        <DialogTitle>Ajouter un nouveau membre</DialogTitle>
-                      </DialogHeader>
-                      <form onSubmit={handleAddMember} className="space-y-4">
-                        <div>
-                          <Label htmlFor="firstName">Prénom</Label>
-                          <Input id="firstName" name="firstName" required />
-                        </div>
-                        <div>
-                          <Label htmlFor="lastName">Nom</Label>
-                          <Input id="lastName" name="lastName" required />
-                        </div>
-                        <div>
-                          <Label htmlFor="email">Email</Label>
-                          <Input id="email" name="email" type="email" required />
-                        </div>
-                        <div>
-                          <Label htmlFor="password">Mot de passe</Label>
-                          <Input id="password" name="password" type="password" required />
-                        </div>
-                        <div>
-                          <Label htmlFor="role">Rôle</Label>
-                          <Select name="role" required>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Sélectionnez un rôle" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="player">Joueur</SelectItem>
-                              <SelectItem value="coach">Coach</SelectItem>
-                              <SelectItem value="super_coach">Super Coach</SelectItem>
-                              <SelectItem value="admin">Administrateur</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        <Button type="submit" className="w-full">
-                          Créer le membre
+                    )}
+                    <Dialog open={addMemberOpen} onOpenChange={setAddMemberOpen}>
+                      <DialogTrigger asChild>
+                        <Button>
+                          <UserPlus className="h-4 w-4 mr-2" />
+                          Ajouter un membre
                         </Button>
-                      </form>
-                    </DialogContent>
-                  </Dialog>
+                      </DialogTrigger>
+                      <DialogContent>
+                        <DialogHeader>
+                          <DialogTitle>Ajouter un nouveau membre</DialogTitle>
+                        </DialogHeader>
+                        <form onSubmit={handleAddMember} className="space-y-4">
+                          <div>
+                            <Label htmlFor="firstName">Prénom</Label>
+                            <Input id="firstName" name="firstName" required />
+                          </div>
+                          <div>
+                            <Label htmlFor="lastName">Nom</Label>
+                            <Input id="lastName" name="lastName" required />
+                          </div>
+                          <div>
+                            <Label htmlFor="email">Email</Label>
+                            <Input id="email" name="email" type="email" required />
+                          </div>
+                          <div>
+                            <Label htmlFor="password">Mot de passe</Label>
+                            <Input id="password" name="password" type="password" required />
+                          </div>
+                          <div>
+                            <Label htmlFor="role">Rôle</Label>
+                            <Select name="role" required>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Sélectionnez un rôle" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="player">Joueur</SelectItem>
+                                <SelectItem value="coach">Coach</SelectItem>
+                                <SelectItem value="super_coach">Super Coach</SelectItem>
+                                <SelectItem value="admin">Administrateur</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <Button type="submit" className="w-full">
+                            Créer le membre
+                          </Button>
+                        </form>
+                      </DialogContent>
+                    </Dialog>
+                  </div>
                 </div>
               </CardHeader>
               <CardContent>
+                <div className="mb-4">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Rechercher par nom..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="pl-10"
+                    />
+                  </div>
+                </div>
                 <Table>
                   <TableHeader>
                     <TableRow>
+                      <TableHead className="w-12">
+                        <Checkbox
+                          checked={selectedMembers.size === filteredMembers.length && filteredMembers.length > 0}
+                          onCheckedChange={toggleSelectAll}
+                        />
+                      </TableHead>
                       <TableHead>Nom</TableHead>
                       <TableHead>Email</TableHead>
                       <TableHead>Rôle</TableHead>
                       <TableHead>Date d'inscription</TableHead>
+                      <TableHead>Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {members.map((member) => (
+                    {filteredMembers.map((member) => (
                       <TableRow key={member.id}>
+                        <TableCell>
+                          <Checkbox
+                            checked={selectedMembers.has(member.id)}
+                            onCheckedChange={() => toggleMemberSelection(member.id)}
+                          />
+                        </TableCell>
                         <TableCell>
                           {member.first_name} {member.last_name}
                         </TableCell>
@@ -322,12 +456,93 @@ const Admin = () => {
                         <TableCell>
                           {new Date(member.created_at).toLocaleDateString("fr-FR")}
                         </TableCell>
+                        <TableCell>
+                          <div className="flex gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                setSelectedMember(member);
+                                setEditMemberOpen(true);
+                              }}
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="destructive"
+                              size="sm"
+                              onClick={() => handleDeleteMember(member.id)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
                 </Table>
               </CardContent>
             </Card>
+
+            <Dialog open={editMemberOpen} onOpenChange={setEditMemberOpen}>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Modifier le membre</DialogTitle>
+                </DialogHeader>
+                {selectedMember && (
+                  <form onSubmit={handleEditMember} className="space-y-4">
+                    <div>
+                      <Label htmlFor="edit-firstName">Prénom</Label>
+                      <Input
+                        id="edit-firstName"
+                        name="firstName"
+                        defaultValue={selectedMember.first_name}
+                        required
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="edit-lastName">Nom</Label>
+                      <Input
+                        id="edit-lastName"
+                        name="lastName"
+                        defaultValue={selectedMember.last_name}
+                        required
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="edit-email">Email</Label>
+                      <Input
+                        id="edit-email"
+                        name="email"
+                        type="email"
+                        defaultValue={selectedMember.email}
+                        required
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="edit-role">Rôle</Label>
+                      <Select
+                        name="role"
+                        defaultValue={selectedMember.user_roles?.[0]?.role || "player"}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="player">Joueur</SelectItem>
+                          <SelectItem value="coach">Coach</SelectItem>
+                          <SelectItem value="super_coach">Super Coach</SelectItem>
+                          <SelectItem value="admin">Administrateur</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <Button type="submit" className="w-full">
+                      Enregistrer les modifications
+                    </Button>
+                  </form>
+                )}
+              </DialogContent>
+            </Dialog>
           </TabsContent>
 
           <TabsContent value="reservations" className="mt-6">
