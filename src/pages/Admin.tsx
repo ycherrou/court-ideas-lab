@@ -233,13 +233,32 @@ const Admin = () => {
   const handleDeleteMember = async (memberId: string) => {
     if (!confirm("Êtes-vous sûr de vouloir supprimer ce membre ?")) return;
 
-    const { error } = await supabase.auth.admin.deleteUser(memberId);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error("Non connecté");
 
-    if (error) {
-      toast.error("Erreur lors de la suppression");
-    } else {
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/delete-member`,
+        {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${session.access_token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ userId: memberId }),
+        }
+      );
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || "Erreur lors de la suppression");
+      }
+
       toast.success("Membre supprimé");
       fetchData();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Erreur lors de la suppression");
     }
   };
 
@@ -247,13 +266,30 @@ const Admin = () => {
     if (selectedMembers.size === 0) return;
     if (!confirm(`Êtes-vous sûr de vouloir supprimer ${selectedMembers.size} membre(s) ?`)) return;
 
-    for (const memberId of selectedMembers) {
-      await supabase.auth.admin.deleteUser(memberId);
-    }
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error("Non connecté");
 
-    toast.success(`${selectedMembers.size} membre(s) supprimé(s)`);
-    setSelectedMembers(new Set());
-    fetchData();
+      for (const memberId of selectedMembers) {
+        await fetch(
+          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/delete-member`,
+          {
+            method: "POST",
+            headers: {
+              "Authorization": `Bearer ${session.access_token}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ userId: memberId }),
+          }
+        );
+      }
+
+      toast.success(`${selectedMembers.size} membre(s) supprimé(s)`);
+      setSelectedMembers(new Set());
+      fetchData();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Erreur lors de la suppression");
+    }
   };
 
   const toggleMemberSelection = (memberId: string) => {
