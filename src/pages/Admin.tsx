@@ -85,7 +85,20 @@ const Admin = () => {
         setMembers(membersWithRoles);
       }
       
-      if (reservationsData.data) setReservations(reservationsData.data as any);
+      // Filtrer les réservations passées
+      if (reservationsData.data) {
+        const now = new Date();
+        const currentDate = now.toISOString().split("T")[0];
+        const currentTime = now.toTimeString().slice(0, 8);
+        
+        const futureReservations = reservationsData.data.filter((res: any) => {
+          if (res.date > currentDate) return true;
+          if (res.date === currentDate && res.start_time > currentTime) return true;
+          return false;
+        });
+        
+        setReservations(futureReservations as any);
+      }
       if (blockedData.data) setBlockedSlots(blockedData.data as any);
       if (courtsData.data) setCourts(courtsData.data);
     } catch (error) {
