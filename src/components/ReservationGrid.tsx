@@ -27,7 +27,20 @@ interface BlockedSlot {
   reason: string;
 }
 
-const HOURS = Array.from({ length: 14 }, (_, i) => i + 7); // 7h to 20h
+const getFilteredHours = (date: Date) => {
+  const now = new Date();
+  const dateString = date.toISOString().split("T")[0];
+  const todayString = now.toISOString().split("T")[0];
+  
+  // Si c'est aujourd'hui, filtrer les heures passées
+  if (dateString === todayString) {
+    const currentHour = now.getHours();
+    return Array.from({ length: 14 }, (_, i) => i + 7).filter(hour => hour >= currentHour);
+  }
+  
+  // Sinon, afficher toutes les heures
+  return Array.from({ length: 14 }, (_, i) => i + 7);
+};
 
 export const ReservationGrid = ({ 
   date, 
@@ -164,6 +177,8 @@ export const ReservationGrid = ({
     return <Skeleton className="w-full h-96" />;
   }
 
+  const filteredHours = getFilteredHours(date);
+
   return (
     <div className="overflow-x-auto overflow-y-auto -mx-2 md:mx-0 max-h-[calc(100vh-250px)]">
       <div className="min-w-max px-2 md:px-0">
@@ -181,7 +196,7 @@ export const ReservationGrid = ({
             </div>
           ))}
 
-          {HOURS.map((hour) => (
+          {filteredHours.map((hour) => (
             <>
               {/* Hour labels - sticky left */}
               <div 
