@@ -159,7 +159,16 @@ const Index = () => {
           }}
         >
           <div className="flex items-center justify-between mb-4">
-            <div className="w-10"></div>
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => api?.scrollPrev()}
+              disabled={currentSlide === 0}
+              className="relative static translate-y-0"
+            >
+              <ChevronLeft className="h-4 w-4" />
+              <span className="sr-only">Jour précédent</span>
+            </Button>
             <div className="text-center flex-1">
               <h3 className="text-lg font-semibold">
                 {format(weekDays[currentSlide], 'EEEE d MMMM yyyy', { locale: fr })}
