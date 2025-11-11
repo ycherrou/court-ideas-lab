@@ -26,10 +26,10 @@ const MyReservations = () => {
   }, [user, authLoading, navigate]);
 
   useEffect(() => {
-    if (user) {
+    if (user && !roleLoading) {
       fetchReservations();
     }
-  }, [user]);
+  }, [user, isAdmin, roleLoading]);
 
   const fetchReservations = async () => {
     if (!user) return;
