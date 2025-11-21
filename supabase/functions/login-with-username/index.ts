@@ -29,17 +29,29 @@ Deno.serve(async (req) => {
       throw new Error("Login et mot de passe requis");
     }
 
-    console.log(`Tentative de connexion pour: ${username}`);
+    console.log(`Tentative de connexion - username reçu: "${username}" (longueur: ${username.length})`);
+    const normalizedUsername = username.toLowerCase().trim();
+    console.log(`Username normalisé: "${normalizedUsername}" (longueur: ${normalizedUsername.length})`);
+
+    // Compter combien de profils ont un username
+    const { count } = await supabase
+      .from("profiles")
+      .select("*", { count: 'exact', head: true })
+      .not("username", "is", null);
+    console.log(`Nombre total de profils avec username: ${count}`);
 
     // Rechercher l'utilisateur par username
     const { data: profile, error: profileError } = await supabase
       .from("profiles")
-      .select("id, email, must_change_password, temporary_pin")
-      .eq("username", username.toLowerCase().trim())
+      .select("id, email, must_change_password, temporary_pin, username")
+      .eq("username", normalizedUsername)
       .maybeSingle();
 
+    console.log(`Résultat recherche - Error:`, profileError);
+    console.log(`Résultat recherche - Profile:`, profile);
+
     if (profileError || !profile) {
-      console.error("Erreur profil:", profileError, "profil:", profile);
+      console.error(`Profil non trouvé pour username: "${normalizedUsername}"`);
       throw new Error("Identifiants invalides");
     }
 
