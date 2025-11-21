@@ -406,6 +406,13 @@ const Admin = () => {
                         Supprimer ({selectedMembers.size})
                       </Button>
                     )}
+                    <Button 
+                      variant="outline"
+                      onClick={() => setBulkImportOpen(true)}
+                    >
+                      <Upload className="h-4 w-4 mr-2" />
+                      Import Excel
+                    </Button>
                     <Dialog open={addMemberOpen} onOpenChange={setAddMemberOpen}>
                       <DialogTrigger asChild>
                         <Button>
