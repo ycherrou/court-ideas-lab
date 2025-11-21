@@ -39,6 +39,7 @@ Deno.serve(async (req) => {
       .maybeSingle();
 
     if (profileError || !profile) {
+      console.error("Erreur profil:", profileError, "profil:", profile);
       throw new Error("Identifiants invalides");
     }
 
