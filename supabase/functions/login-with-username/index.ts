@@ -42,11 +42,11 @@ Deno.serve(async (req) => {
       throw new Error("Identifiants invalides");
     }
 
-    console.log(`Profil trouvé pour ${username}, email: ${profile.email}`);
+    console.log(`Profil trouvé pour ${username}, email: ${profile.email}, temporary_pin: ${profile.temporary_pin}`);
 
     // Vérifier si le PIN correspond au temporary_pin
     if (profile.temporary_pin && profile.temporary_pin === password) {
-      console.log(`Authentification par PIN pour ${username}`);
+      console.log(`Authentification par PIN pour ${username} avec PIN correct`);
       
       // Mettre à jour le mot de passe de l'utilisateur avec le PIN
       const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(
@@ -58,6 +58,8 @@ Deno.serve(async (req) => {
         console.error("Erreur mise à jour mot de passe:", updateError);
         throw new Error("Erreur lors de la connexion");
       }
+    } else {
+      console.log(`PIN incorrect ou absent pour ${username}. temporary_pin = ${profile.temporary_pin}, fourni = ${password}`);
     }
 
     // Authentifier avec email et password
