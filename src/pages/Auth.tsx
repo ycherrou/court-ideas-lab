@@ -132,50 +132,21 @@ const Auth = () => {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <Tabs defaultValue="login" className="w-full">
+          <Tabs defaultValue="email" className="w-full">
             <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="login">Login (Nom d'utilisateur)</TabsTrigger>
-              <TabsTrigger value="email">Email (Administrateur)</TabsTrigger>
+              <TabsTrigger value="email">Email</TabsTrigger>
+              <TabsTrigger value="login">Login</TabsTrigger>
             </TabsList>
             
-            <TabsContent value="login">
-              <form onSubmit={handleUsernameLogin} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="username">Nom d'utilisateur</Label>
-                  <Input
-                    id="username"
-                    name="username"
-                    type="text"
-                    placeholder="Ex: kamrabet"
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="pin">Code PIN (4 chiffres)</Label>
-                  <Input
-                    id="pin"
-                    name="password"
-                    type="password"
-                    placeholder="Ex: 8117"
-                    maxLength={4}
-                    required
-                  />
-                </div>
-                <Button type="submit" className="w-full" disabled={loading}>
-                  {loading ? "Connexion..." : "Se connecter"}
-                </Button>
-              </form>
-            </TabsContent>
-
             <TabsContent value="email">
               <form onSubmit={handleEmailLogin} className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="login-email">Adresse email</Label>
+                  <Label htmlFor="login-email">Email</Label>
                   <Input
                     id="login-email"
                     name="email"
                     type="email"
-                    placeholder="admin@exemple.com"
+                    placeholder="votre@email.com"
                     required
                   />
                 </div>
@@ -185,7 +156,36 @@ const Auth = () => {
                     id="login-password"
                     name="password"
                     type="password"
-                    placeholder="••••••••"
+                    placeholder="••••••"
+                    required
+                  />
+                </div>
+                <Button type="submit" className="w-full" disabled={loading}>
+                  {loading ? "Connexion..." : "Se connecter"}
+                </Button>
+              </form>
+            </TabsContent>
+
+            <TabsContent value="login">
+              <form onSubmit={handleUsernameLogin} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="username">Login</Label>
+                  <Input
+                    id="username"
+                    name="username"
+                    type="text"
+                    placeholder="jdupont"
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="pin">Code PIN</Label>
+                  <Input
+                    id="pin"
+                    name="password"
+                    type="password"
+                    placeholder="1234"
+                    maxLength={4}
                     required
                   />
                 </div>
