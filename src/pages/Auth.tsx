@@ -5,12 +5,18 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { z } from "zod";
 
 const loginSchema = z.object({
   email: z.string().email("Email invalide"),
   password: z.string().min(6, "Le mot de passe doit contenir au moins 6 caractères"),
+});
+
+const usernameLoginSchema = z.object({
+  username: z.string().min(2, "Login invalide"),
+  password: z.string().min(4, "PIN invalide"),
 });
 
 const Auth = () => {
@@ -27,7 +33,7 @@ const Auth = () => {
     checkUser();
   }, [navigate]);
 
-  const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
+  const handleEmailLogin = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setLoading(true);
 
@@ -58,6 +64,63 @@ const Auth = () => {
     }
   };
 
+  const handleUsernameLogin = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setLoading(true);
+
+    const formData = new FormData(e.currentTarget);
+    const username = formData.get("username") as string;
+    const password = formData.get("password") as string;
+
+    try {
+      usernameLoginSchema.parse({ username, password });
+
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/login-with-username`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ username, password }),
+        }
+      );
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || "Erreur de connexion");
+      }
+
+      // Définir la session
+      const { error: sessionError } = await supabase.auth.setSession({
+        access_token: result.session.access_token,
+        refresh_token: result.session.refresh_token,
+      });
+
+      if (sessionError) throw sessionError;
+
+      toast.success("Connexion réussie !");
+      
+      // Redirection conditionnelle
+      if (result.mustChangePassword) {
+        navigate("/change-password");
+      } else {
+        navigate("/");
+      }
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        toast.error(error.errors[0].message);
+      } else if (error instanceof Error) {
+        toast.error(error.message);
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
@@ -65,35 +128,73 @@ const Auth = () => {
         <CardHeader>
           <CardTitle className="text-2xl text-center">Réservation de Courts de Tennis</CardTitle>
           <CardDescription className="text-center">
-            Connectez-vous ou créez un compte pour réserver un terrain
+            Connectez-vous pour réserver un terrain
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleLogin} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="login-email">Email</Label>
-              <Input
-                id="login-email"
-                name="email"
-                type="email"
-                placeholder="votre@email.com"
-                required
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="login-password">Mot de passe</Label>
-              <Input
-                id="login-password"
-                name="password"
-                type="password"
-                placeholder="••••••"
-                required
-              />
-            </div>
-            <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? "Connexion..." : "Se connecter"}
-            </Button>
-          </form>
+          <Tabs defaultValue="email" className="w-full">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="email">Email</TabsTrigger>
+              <TabsTrigger value="login">Login</TabsTrigger>
+            </TabsList>
+            
+            <TabsContent value="email">
+              <form onSubmit={handleEmailLogin} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="login-email">Email</Label>
+                  <Input
+                    id="login-email"
+                    name="email"
+                    type="email"
+                    placeholder="votre@email.com"
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="login-password">Mot de passe</Label>
+                  <Input
+                    id="login-password"
+                    name="password"
+                    type="password"
+                    placeholder="••••••"
+                    required
+                  />
+                </div>
+                <Button type="submit" className="w-full" disabled={loading}>
+                  {loading ? "Connexion..." : "Se connecter"}
+                </Button>
+              </form>
+            </TabsContent>
+
+            <TabsContent value="login">
+              <form onSubmit={handleUsernameLogin} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="username">Login</Label>
+                  <Input
+                    id="username"
+                    name="username"
+                    type="text"
+                    placeholder="jdupont"
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="pin">Code PIN</Label>
+                  <Input
+                    id="pin"
+                    name="password"
+                    type="password"
+                    placeholder="1234"
+                    maxLength={4}
+                    required
+                  />
+                </div>
+                <Button type="submit" className="w-full" disabled={loading}>
+                  {loading ? "Connexion..." : "Se connecter"}
+                </Button>
+              </form>
+            </TabsContent>
+          </Tabs>
         </CardContent>
       </Card>
     </div>

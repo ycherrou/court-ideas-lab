@@ -1,1 +1,13 @@
 project_id = "saoeujleuqfjjqphgtyk"
+
+[functions.create-member]
+verify_jwt = true
+
+[functions.delete-member]
+verify_jwt = true
+
+[functions.bulk-import-members]
+verify_jwt = true
+
+[functions.login-with-username]
+verify_jwt = false
