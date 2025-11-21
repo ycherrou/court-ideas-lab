@@ -12,6 +12,17 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_ANON_KEY") ?? ""
     );
 
+    const supabaseAdmin = createClient(
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
+      {
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false
+        }
+      }
+    );
+
     const { username, password } = await req.json();
 
     if (!username || !password) {
@@ -23,7 +34,7 @@ Deno.serve(async (req) => {
     // Rechercher l'utilisateur par username
     const { data: profile, error: profileError } = await supabase
       .from("profiles")
-      .select("id, email, must_change_password")
+      .select("id, email, must_change_password, temporary_pin")
       .eq("username", username.toLowerCase().trim())
       .maybeSingle();
 
@@ -32,6 +43,22 @@ Deno.serve(async (req) => {
     }
 
     console.log(`Profil trouvé pour ${username}, email: ${profile.email}`);
+
+    // Vérifier si le PIN correspond au temporary_pin
+    if (profile.temporary_pin && profile.temporary_pin === password) {
+      console.log(`Authentification par PIN pour ${username}`);
+      
+      // Mettre à jour le mot de passe de l'utilisateur avec le PIN
+      const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(
+        profile.id,
+        { password: password }
+      );
+
+      if (updateError) {
+        console.error("Erreur mise à jour mot de passe:", updateError);
+        throw new Error("Erreur lors de la connexion");
+      }
+    }
 
     // Authentifier avec email et password
     const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
