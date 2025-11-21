@@ -51,27 +51,42 @@ Deno.serve(async (req) => {
     console.log(`Profil trouvé pour ${username}, email: ${profile.email}, temporary_pin: ${profile.temporary_pin}`);
 
     // Vérifier si le PIN correspond au temporary_pin
+    let loginPassword = password;
+
     if (profile.temporary_pin && profile.temporary_pin === password) {
       console.log(`Authentification par PIN pour ${username} avec PIN correct`);
-      
-      // Mettre à jour le mot de passe de l'utilisateur avec le PIN
+
+      // Générer un mot de passe temporaire fort pour satisfaire les règles de sécurité
+      const tempPassword = `${password}_${crypto.randomUUID()}A!`;
+      loginPassword = tempPassword;
+
       const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(
         profile.id,
-        { password: password }
+        { password: tempPassword }
       );
 
       if (updateError) {
         console.error("Erreur mise à jour mot de passe:", updateError);
         throw new Error("Erreur lors de la connexion");
       }
+
+      // Marquer le profil pour forcer le changement de mot de passe et invalider le PIN
+      const { error: profileUpdateError } = await supabaseAdmin
+        .from("profiles")
+        .update({ temporary_pin: null, must_change_password: true })
+        .eq("id", profile.id);
+
+      if (profileUpdateError) {
+        console.error("Erreur mise à jour du profil après login PIN:", profileUpdateError);
+      }
     } else {
       console.log(`PIN incorrect ou absent pour ${username}. temporary_pin = ${profile.temporary_pin}, fourni = ${password}`);
     }
 
-    // Authentifier avec email et password
+    // Authentifier avec email et mot de passe (PIN ou mot de passe temporaire fort)
     const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
       email: profile.email,
-      password: password,
+      password: loginPassword,
     });
 
     if (authError) {
