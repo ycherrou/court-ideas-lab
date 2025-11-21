@@ -132,31 +132,32 @@ const Auth = () => {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <Tabs defaultValue="email" className="w-full">
+          <Tabs defaultValue="login" className="w-full">
             <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="email">Email</TabsTrigger>
-              <TabsTrigger value="login">Login</TabsTrigger>
+              <TabsTrigger value="login">Login (Nom d'utilisateur)</TabsTrigger>
+              <TabsTrigger value="email">Email (Administrateur)</TabsTrigger>
             </TabsList>
             
-            <TabsContent value="email">
-              <form onSubmit={handleEmailLogin} className="space-y-4">
+            <TabsContent value="login">
+              <form onSubmit={handleUsernameLogin} className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="login-email">Email</Label>
+                  <Label htmlFor="username">Nom d'utilisateur</Label>
                   <Input
-                    id="login-email"
-                    name="email"
-                    type="email"
-                    placeholder="votre@email.com"
+                    id="username"
+                    name="username"
+                    type="text"
+                    placeholder="Ex: kamrabet"
                     required
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="login-password">Mot de passe</Label>
+                  <Label htmlFor="pin">Code PIN (4 chiffres)</Label>
                   <Input
-                    id="login-password"
+                    id="pin"
                     name="password"
                     type="password"
-                    placeholder="••••••"
+                    placeholder="Ex: 8117"
+                    maxLength={4}
                     required
                   />
                 </div>
@@ -166,26 +167,25 @@ const Auth = () => {
               </form>
             </TabsContent>
 
-            <TabsContent value="login">
-              <form onSubmit={handleUsernameLogin} className="space-y-4">
+            <TabsContent value="email">
+              <form onSubmit={handleEmailLogin} className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="username">Login</Label>
+                  <Label htmlFor="login-email">Adresse email</Label>
                   <Input
-                    id="username"
-                    name="username"
-                    type="text"
-                    placeholder="jdupont"
+                    id="login-email"
+                    name="email"
+                    type="email"
+                    placeholder="admin@exemple.com"
                     required
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="pin">Code PIN</Label>
+                  <Label htmlFor="login-password">Mot de passe</Label>
                   <Input
-                    id="pin"
+                    id="login-password"
                     name="password"
                     type="password"
-                    placeholder="1234"
-                    maxLength={4}
+                    placeholder="••••••••"
                     required
                   />
                 </div>
