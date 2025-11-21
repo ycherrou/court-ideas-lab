@@ -107,6 +107,9 @@ export type Database = {
           first_name: string
           id: string
           last_name: string
+          must_change_password: boolean | null
+          temporary_pin: string | null
+          username: string | null
         }
         Insert: {
           created_at?: string
@@ -114,6 +117,9 @@ export type Database = {
           first_name: string
           id: string
           last_name: string
+          must_change_password?: boolean | null
+          temporary_pin?: string | null
+          username?: string | null
         }
         Update: {
           created_at?: string
@@ -121,6 +127,9 @@ export type Database = {
           first_name?: string
           id?: string
           last_name?: string
+          must_change_password?: boolean | null
+          temporary_pin?: string | null
+          username?: string | null
         }
         Relationships: []
       }

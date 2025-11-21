@@ -13,7 +13,8 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
-import { ArrowLeft, UserPlus, Trash2, Calendar, Ban, Edit, Search } from "lucide-react";
+import { ArrowLeft, UserPlus, Trash2, Calendar, Ban, Edit, Search, Upload, Eye, EyeOff } from "lucide-react";
+import { BulkImportModal } from "@/components/BulkImportModal";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Skeleton } from "@/components/ui/skeleton";
 import { z } from "zod";
@@ -39,6 +40,8 @@ const Admin = () => {
   const [selectedMember, setSelectedMember] = useState<any>(null);
   const [selectedMembers, setSelectedMembers] = useState<Set<string>>(new Set());
   const [searchQuery, setSearchQuery] = useState("");
+  const [bulkImportOpen, setBulkImportOpen] = useState(false);
+  const [showPins, setShowPins] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -310,6 +313,16 @@ const Admin = () => {
     }
   };
 
+  const togglePinVisibility = (memberId: string) => {
+    const newShowPins = new Set(showPins);
+    if (newShowPins.has(memberId)) {
+      newShowPins.delete(memberId);
+    } else {
+      newShowPins.add(memberId);
+    }
+    setShowPins(newShowPins);
+  };
+
   const handleCreateBlockedSlot = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
@@ -352,24 +365,25 @@ const Admin = () => {
   if (!isAdmin) return null;
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="border-b">
-        <div className="container mx-auto px-4 py-4 flex items-center gap-4">
-          <Button variant="ghost" onClick={() => navigate("/")}>
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Retour
-          </Button>
-          <h1 className="text-2xl font-bold">Panneau d'administration</h1>
-        </div>
-      </header>
+    <>
+      <div className="min-h-screen bg-background">
+        <header className="border-b">
+          <div className="container mx-auto px-4 py-4 flex items-center gap-4">
+            <Button variant="ghost" onClick={() => navigate("/")}>
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Retour
+            </Button>
+            <h1 className="text-2xl font-bold">Panneau d'administration</h1>
+          </div>
+        </header>
 
-      <main className="container mx-auto px-4 py-8">
-        <Tabs defaultValue="members">
-          <TabsList className="grid w-full grid-cols-3 max-w-md">
-            <TabsTrigger value="members">Membres</TabsTrigger>
-            <TabsTrigger value="reservations">Réservations</TabsTrigger>
-            <TabsTrigger value="blocked">Blocages</TabsTrigger>
-          </TabsList>
+        <main className="container mx-auto px-4 py-8">
+          <Tabs defaultValue="members">
+            <TabsList className="grid w-full grid-cols-3 max-w-md">
+              <TabsTrigger value="members">Membres</TabsTrigger>
+              <TabsTrigger value="reservations">Réservations</TabsTrigger>
+              <TabsTrigger value="blocked">Blocages</TabsTrigger>
+            </TabsList>
 
           <TabsContent value="members" className="mt-6">
             <Card>
@@ -466,6 +480,8 @@ const Admin = () => {
                       </TableHead>
                       <TableHead>Nom</TableHead>
                       <TableHead>Email</TableHead>
+                      <TableHead>Login</TableHead>
+                      <TableHead>PIN</TableHead>
                       <TableHead>Rôle</TableHead>
                       <TableHead>Date d'inscription</TableHead>
                       <TableHead>Actions</TableHead>
@@ -482,8 +498,42 @@ const Admin = () => {
                         </TableCell>
                         <TableCell>
                           {member.first_name} {member.last_name}
+                          {member.must_change_password && (
+                            <span className="ml-2 text-xs bg-orange-100 text-orange-800 px-2 py-1 rounded">
+                              Nouveau
+                            </span>
+                          )}
                         </TableCell>
                         <TableCell>{member.email}</TableCell>
+                        <TableCell>
+                          {member.username ? (
+                            <span className="font-mono text-sm">{member.username}</span>
+                          ) : (
+                            <span className="text-muted-foreground text-sm">-</span>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {member.temporary_pin ? (
+                            <div className="flex items-center gap-2">
+                              <span className="font-mono text-sm">
+                                {showPins.has(member.id) ? member.temporary_pin : "••••"}
+                              </span>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => togglePinVisibility(member.id)}
+                              >
+                                {showPins.has(member.id) ? (
+                                  <EyeOff className="w-4 h-4" />
+                                ) : (
+                                  <Eye className="w-4 h-4" />
+                                )}
+                              </Button>
+                            </div>
+                          ) : (
+                            <span className="text-muted-foreground text-sm">-</span>
+                          )}
+                        </TableCell>
                         <TableCell>
                           {member.user_roles?.[0]?.role || 'player'}
                           {member.user_roles?.[0]?.role === 'coach' && ' 🎾'}
@@ -715,15 +765,22 @@ const Admin = () => {
                           </TableCell>
                         </TableRow>
                       ))}
-                    </TableBody>
-                  </Table>
-                </CardContent>
-              </Card>
-            </div>
-          </TabsContent>
-        </Tabs>
-      </main>
-    </div>
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </div>
+      </TabsContent>
+          </Tabs>
+        </main>
+      </div>
+
+      <BulkImportModal
+        open={bulkImportOpen}
+        onOpenChange={setBulkImportOpen}
+        onSuccess={fetchData}
+      />
+    </>
   );
 };
 
