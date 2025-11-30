@@ -132,125 +132,126 @@ Deno.serve(async (req) => {
     );
 
     const validRoles = ['player', 'admin', 'coach', 'super_coach'];
-    const results = [];
-    const errors = [];
+    const results: Array<{login: string, pin: string, fullName: string, email: string, role: string}> = [];
+    const errors: Array<{fullName: string, email: string, error: string}> = [];
 
-    for (const member of members) {
-      try {
-        const { fullName, email, role } = member;
+    // Traiter les membres en batch de 50 pour éviter les timeouts
+    const BATCH_SIZE = 50;
+    
+    for (let i = 0; i < members.length; i += BATCH_SIZE) {
+      const batch = members.slice(i, i + BATCH_SIZE);
+      console.log(`Processing batch ${Math.floor(i / BATCH_SIZE) + 1}/${Math.ceil(members.length / BATCH_SIZE)}`);
+      
+      // Traiter le batch en parallèle
+      const batchPromises = batch.map(async (member) => {
+        try {
+          const { fullName, email, role } = member;
 
-        // Validation
-        if (!fullName || fullName.trim() === '') {
-          errors.push({
-            fullName: fullName || 'Non spécifié',
-            email: email || 'Non spécifié',
-            error: 'Le nom complet est requis'
-          });
-          continue;
-        }
-
-        // Valider le rôle
-        const assignedRole = role && validRoles.includes(role.toLowerCase()) 
-          ? role.toLowerCase() 
-          : 'player';
-
-        // Générer login et PIN
-        const login = generateLogin(fullName, existingUsernames);
-        existingUsernames.add(login); // Ajouter à la liste pour éviter les doublons
-        const pin = generatePIN();
-
-        // Créer l'utilisateur avec un mot de passe temporaire fort
-        const tempPassword = `Temp${pin}${crypto.randomUUID()}!`;
-        
-        const userEmail = email && email.trim() !== '' 
-          ? email 
-          : `${login}@tempmail.com`;
-
-        console.log(`Creating user: ${login} (${fullName}) with email ${userEmail}`);
-
-        const { data: userData, error: userError } = await supabaseAdmin.auth.admin.createUser({
-          email: userEmail,
-          password: tempPassword,
-          email_confirm: true,
-          user_metadata: {
-            full_name: fullName,
+          // Validation
+          if (!fullName || fullName.trim() === '') {
+            return {
+              success: false,
+              error: {
+                fullName: fullName || 'Non spécifié',
+                email: email || 'Non spécifié',
+                error: 'Le nom complet est requis'
+              }
+            };
           }
-        });
 
-        if (userError) {
-          console.error(`Error creating user ${login}:`, userError);
-          errors.push({
-            fullName,
+          // Valider le rôle
+          const assignedRole = role && validRoles.includes(role.toLowerCase()) 
+            ? role.toLowerCase() 
+            : 'player';
+
+          // Générer login et PIN
+          const login = generateLogin(fullName, existingUsernames);
+          existingUsernames.add(login);
+          const pin = generatePIN();
+
+          // Créer l'utilisateur avec un mot de passe temporaire fort
+          const tempPassword = `Temp${pin}${crypto.randomUUID()}!`;
+          
+          const userEmail = email && email.trim() !== '' 
+            ? email 
+            : `${login}@tempmail.com`;
+
+          const { data: userData, error: userError } = await supabaseAdmin.auth.admin.createUser({
             email: userEmail,
-            error: userError.message
-          });
-          continue;
-        }
-
-        if (!userData.user) {
-          console.error(`No user data returned for ${login}`);
-          errors.push({
-            fullName,
-            email: userEmail,
-            error: 'Aucune donnée utilisateur retournée'
-          });
-          continue;
-        }
-
-        // Mettre à jour le profil avec le username et le PIN
-        const { error: profileError } = await supabaseAdmin
-          .from('profiles')
-          .update({
-            username: login,
-            temporary_pin: pin,
-            must_change_password: true
-          })
-          .eq('id', userData.user.id);
-
-        if (profileError) {
-          console.error(`Error updating profile for ${login}:`, profileError);
-          // On continue quand même car l'utilisateur est créé
-        }
-
-        // Assigner le rôle
-        const { error: roleError } = await supabaseAdmin
-          .from('user_roles')
-          .delete()
-          .eq('user_id', userData.user.id);
-
-        if (roleError) {
-          console.error(`Error deleting existing roles for ${login}:`, roleError);
-        }
-
-        const { error: insertRoleError } = await supabaseAdmin
-          .from('user_roles')
-          .insert({
-            user_id: userData.user.id,
-            role: assignedRole
+            password: tempPassword,
+            email_confirm: true,
+            user_metadata: {
+              full_name: fullName,
+            }
           });
 
-        if (insertRoleError) {
-          console.error(`Error assigning role for ${login}:`, insertRoleError);
+          if (userError || !userData.user) {
+            return {
+              success: false,
+              error: {
+                fullName,
+                email: userEmail,
+                error: userError?.message || 'Aucune donnée utilisateur retournée'
+              }
+            };
+          }
+
+          // Mettre à jour le profil et assigner le rôle
+          await supabaseAdmin
+            .from('profiles')
+            .update({
+              username: login,
+              temporary_pin: pin,
+              must_change_password: true
+            })
+            .eq('id', userData.user.id);
+
+          // Supprimer les anciens rôles et assigner le nouveau
+          await supabaseAdmin
+            .from('user_roles')
+            .delete()
+            .eq('user_id', userData.user.id);
+
+          await supabaseAdmin
+            .from('user_roles')
+            .insert({
+              user_id: userData.user.id,
+              role: assignedRole
+            });
+
+          return {
+            success: true,
+            result: {
+              login,
+              pin,
+              fullName,
+              email: userEmail,
+              role: assignedRole
+            }
+          };
+
+        } catch (error) {
+          return {
+            success: false,
+            error: {
+              fullName: member.fullName || 'Inconnu',
+              email: member.email || 'Non spécifié',
+              error: error instanceof Error ? error.message : 'Erreur inconnue'
+            }
+          };
         }
+      });
 
-        console.log(`Successfully created user: ${login} with role ${assignedRole}`);
-
-        results.push({
-          login,
-          pin,
-          fullName,
-          email: userEmail,
-          role: assignedRole
-        });
-
-      } catch (error) {
-        console.error('Error processing member:', error);
-        errors.push({
-          fullName: member.fullName || 'Inconnu',
-          email: member.email || 'Non spécifié',
-          error: error instanceof Error ? error.message : 'Erreur inconnue'
-        });
-      }
+      const batchResults = await Promise.all(batchPromises);
+      
+      // Séparer les succès et les erreurs
+      batchResults.forEach(result => {
+        if (result.success && result.result) {
+          results.push(result.result);
+        } else if (!result.success && result.error) {
+          errors.push(result.error);
+        }
+      });
     }
 
     console.log(`Import completed: ${results.length} success, ${errors.length} errors`);
