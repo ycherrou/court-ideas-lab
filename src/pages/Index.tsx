@@ -12,6 +12,7 @@ import { MobileNav } from "@/components/MobileNav";
 import { Carousel, CarouselContent, CarouselItem, CarouselApi } from "@/components/ui/carousel";
 import { addDays, format, startOfWeek } from "date-fns";
 import { fr } from "date-fns/locale";
+import { supabase } from "@/integrations/supabase/client";
 
 const Index = () => {
   const navigate = useNavigate();
@@ -27,6 +28,7 @@ const Index = () => {
   } | null>(null);
   const [api, setApi] = useState<CarouselApi>();
   const [currentSlide, setCurrentSlide] = useState(0);
+  const [userName, setUserName] = useState<string>("");
   
   // Generate 7 days starting from today
   const today = new Date();
@@ -54,6 +56,24 @@ const Index = () => {
       navigate("/auth");
     }
   }, [user, authLoading, navigate]);
+
+  useEffect(() => {
+    const fetchUserName = async () => {
+      if (user?.id) {
+        const { data } = await supabase
+          .from("profiles")
+          .select("full_name")
+          .eq("id", user.id)
+          .single();
+        
+        if (data?.full_name) {
+          setUserName(data.full_name);
+        }
+      }
+    };
+    
+    fetchUserName();
+  }, [user?.id]);
 
   useEffect(() => {
     if (!api) return;
@@ -92,7 +112,7 @@ const Index = () => {
           </div>
           <div className="flex items-center gap-4">
             <span className="text-sm text-muted-foreground">
-              {user.email}
+              {userName || user.email}
             </span>
             {isAdmin ? (
               <>
