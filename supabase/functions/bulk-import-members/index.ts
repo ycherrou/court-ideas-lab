@@ -65,8 +65,8 @@ Deno.serve(async (req) => {
       })
     }
 
-    if (members.length > 100) {
-      return new Response(JSON.stringify({ error: 'Maximum 100 membres par import' }), {
+    if (members.length > 500) {
+      return new Response(JSON.stringify({ error: 'Maximum 500 membres par import. Divisez votre fichier en plusieurs parties.' }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       })
