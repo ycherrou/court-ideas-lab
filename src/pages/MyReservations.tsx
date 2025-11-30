@@ -55,7 +55,11 @@ const MyReservations = () => {
 
       if (data) {
         const now = new Date();
-        const today = now.toISOString().split("T")[0];
+        // Fix timezone issue - use local date
+        const todayYear = now.getFullYear();
+        const todayMonth = String(now.getMonth() + 1).padStart(2, '0');
+        const todayDay = String(now.getDate()).padStart(2, '0');
+        const today = `${todayYear}-${todayMonth}-${todayDay}`;
         const currentTime = now.toTimeString().split(" ")[0];
 
         const active = data.filter((res: any) => {

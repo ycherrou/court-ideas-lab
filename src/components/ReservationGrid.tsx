@@ -29,8 +29,16 @@ interface BlockedSlot {
 
 const getFilteredHours = (date: Date) => {
   const now = new Date();
-  const dateString = date.toISOString().split("T")[0];
-  const todayString = now.toISOString().split("T")[0];
+  // Fix timezone issue - use local date
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  const dateString = `${year}-${month}-${day}`;
+  
+  const todayYear = now.getFullYear();
+  const todayMonth = String(now.getMonth() + 1).padStart(2, '0');
+  const todayDay = String(now.getDate()).padStart(2, '0');
+  const todayString = `${todayYear}-${todayMonth}-${todayDay}`;
   
   // Si c'est aujourd'hui, filtrer les heures passées
   if (dateString === todayString) {
@@ -56,7 +64,11 @@ export const ReservationGrid = ({
   const [blockedSlots, setBlockedSlots] = useState<BlockedSlot[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const dateString = date.toISOString().split("T")[0];
+  // Fix timezone issue - use local date
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  const dateString = `${year}-${month}-${day}`;
 
   useEffect(() => {
     fetchData();
