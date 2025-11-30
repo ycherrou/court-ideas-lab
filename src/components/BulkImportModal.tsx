@@ -1,13 +1,10 @@
 import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Progress } from "@/components/ui/progress";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { toast } from "sonner";
-import { FileSpreadsheet, Download, Upload, Eye, EyeOff } from "lucide-react";
+import { Download, Upload, FileText, Eye, EyeOff } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 import * as XLSX from "xlsx";
 
 interface BulkImportModalProps {
@@ -19,82 +16,67 @@ interface BulkImportModalProps {
 interface ImportResult {
   login: string;
   pin: string;
-  firstName: string;
-  lastName: string;
+  fullName: string;
   email: string;
   role: string;
 }
 
 export const BulkImportModal = ({ open, onOpenChange, onSuccess }: BulkImportModalProps) => {
   const [file, setFile] = useState<File | null>(null);
-  const [members, setMembers] = useState<any[]>([]);
+  const [parsedMembers, setParsedMembers] = useState<any[]>([]);
   const [importing, setImporting] = useState(false);
   const [progress, setProgress] = useState(0);
-  const [results, setResults] = useState<{
-    success: ImportResult[];
-    errors: any[];
-    summary: { total: number; succeeded: number; failed: number };
-  } | null>(null);
-  const [showPins, setShowPins] = useState<Set<number>>(new Set());
+  const [results, setResults] = useState<{ success: ImportResult[], errors: any[] } | null>(null);
+  const [showPins, setShowPins] = useState(false);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
-    if (!selectedFile) return;
-
-    if (selectedFile.size > 5 * 1024 * 1024) {
-      toast.error("Le fichier ne doit pas dépasser 5MB");
-      return;
+    if (selectedFile) {
+      setFile(selectedFile);
+      parseExcelFile(selectedFile);
     }
-
-    setFile(selectedFile);
-    parseExcelFile(selectedFile);
   };
 
   const parseExcelFile = (file: File) => {
     const reader = new FileReader();
-    
     reader.onload = (e) => {
       try {
         const data = new Uint8Array(e.target?.result as ArrayBuffer);
         const workbook = XLSX.read(data, { type: "array" });
-        const sheetName = workbook.SheetNames[0];
-        const worksheet = workbook.Sheets[sheetName];
-        const jsonData = XLSX.utils.sheet_to_json(worksheet);
+        const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+        const jsonData = XLSX.utils.sheet_to_json(firstSheet);
 
-        const parsedMembers = jsonData.map((row: any) => ({
-          firstName: row["Prénom"] || row["prenom"] || "",
-          lastName: row["Nom"] || row["nom"] || "",
-          email: row["Email"] || row["email"] || "",
-          role: row["Rôle"] || row["role"] || "player",
+        const members = jsonData.map((row: any) => ({
+          fullName: row["Nom complet"] || row["nom complet"] || row["Nom"] || row["nom"] || row["NOM"] || "",
+          email: row["Email"] || row["email"] || row["EMAIL"] || "",
+          role: row["Rôle"] || row["Role"] || row["role"] || row["ROLE"] || "player"
         }));
 
-        setMembers(parsedMembers);
-        toast.success(`${parsedMembers.length} membres détectés`);
+        setParsedMembers(members);
+        toast.success(`${members.length} membres détectés`);
       } catch (error) {
         toast.error("Erreur lors de la lecture du fichier");
         console.error(error);
       }
     };
-
     reader.readAsArrayBuffer(file);
   };
 
   const downloadExampleFile = () => {
     const exampleData = [
-      { Prénom: "Jean", Nom: "Dupont", Email: "jean.dupont@email.com", Rôle: "player" },
-      { Prénom: "Marie", Nom: "Martin", Email: "", Rôle: "coach" },
-      { Prénom: "Pierre", Nom: "Durant", Email: "pierre@email.com", Rôle: "player" },
+      { "Nom complet": "Jean Dupont", "Email": "jean.dupont@example.com", "Rôle": "player" },
+      { "Nom complet": "Marie Martin", "Email": "", "Rôle": "coach" },
+      { "Nom complet": "Pierre Durand", "Email": "pierre@example.com", "Rôle": "admin" }
     ];
 
     const ws = XLSX.utils.json_to_sheet(exampleData);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Membres");
     XLSX.writeFile(wb, "exemple_import_membres.xlsx");
-    toast.success("Fichier exemple téléchargé");
   };
 
   const handleImport = async () => {
-    if (members.length === 0) {
+    if (parsedMembers.length === 0) {
       toast.error("Aucun membre à importer");
       return;
     }
@@ -104,101 +86,73 @@ export const BulkImportModal = ({ open, onOpenChange, onSuccess }: BulkImportMod
 
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session) throw new Error("Non connecté");
+      if (!session) {
+        toast.error("Session expirée");
+        return;
+      }
 
-      const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/bulk-import-members`,
-        {
-          method: "POST",
-          headers: {
-            "Authorization": `Bearer ${session.access_token}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ members }),
+      const { data, error } = await supabase.functions.invoke("bulk-import-members", {
+        body: { members: parsedMembers },
+        headers: {
+          Authorization: `Bearer ${session.access_token}`
         }
-      );
+      });
 
-      const result = await response.json();
+      if (error) throw error;
 
-      if (!response.ok) {
-        throw new Error(result.error || "Erreur lors de l'import");
-      }
-
-      setResults(result);
-      setProgress(100);
-
-      // Télécharger automatiquement le fichier credentials
-      if (result.success.length > 0) {
-        downloadCredentials(result.success);
-      }
-
-      toast.success(`Import terminé: ${result.summary.succeeded} membres créés`);
+      setResults(data);
+      toast.success(`Import terminé: ${data.success.length} réussis, ${data.errors.length} erreurs`);
       
-      if (result.summary.failed > 0) {
-        toast.error(`${result.summary.failed} erreurs`);
+      if (data.success.length > 0) {
+        onSuccess();
       }
-
-      onSuccess();
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Erreur lors de l'import");
+    } catch (error: any) {
+      console.error("Import error:", error);
+      toast.error(error.message || "Erreur lors de l'import");
     } finally {
       setImporting(false);
+      setProgress(0);
     }
   };
 
-  const downloadCredentials = (credentials: ImportResult[]) => {
-    const data = credentials.map(c => ({
-      Login: c.login,
-      "Code PIN": c.pin,
-      Prénom: c.firstName,
-      Nom: c.lastName,
-      Email: c.email,
-      Rôle: c.role,
+  const downloadCredentials = () => {
+    if (!results || results.success.length === 0) return;
+
+    const credentials = results.success.map(r => ({
+      "Nom complet": r.fullName,
+      "Email": r.email,
+      "Login": r.login,
+      "PIN": r.pin,
+      "Rôle": r.role
     }));
 
-    const ws = XLSX.utils.json_to_sheet(data);
+    const ws = XLSX.utils.json_to_sheet(credentials);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Identifiants");
-    
-    const now = new Date();
-    const filename = `credentials_tennis_${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}_${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}.xlsx`;
-    
-    XLSX.writeFile(wb, filename);
+    XLSX.writeFile(wb, "identifiants_membres.xlsx");
+    toast.success("Fichier téléchargé");
   };
 
   const downloadErrors = () => {
     if (!results || results.errors.length === 0) return;
 
-    const data = results.errors.map(e => ({
-      Ligne: e.index,
-      Prénom: e.firstName,
-      Nom: e.lastName,
-      Erreur: e.error,
-    }));
-
-    const ws = XLSX.utils.json_to_sheet(data);
+    const ws = XLSX.utils.json_to_sheet(results.errors);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Erreurs");
     XLSX.writeFile(wb, "erreurs_import.xlsx");
-    toast.success("Fichier d'erreurs téléchargé");
+    toast.success("Fichier téléchargé");
   };
 
-  const togglePinVisibility = (index: number) => {
-    const newShowPins = new Set(showPins);
-    if (newShowPins.has(index)) {
-      newShowPins.delete(index);
-    } else {
-      newShowPins.add(index);
-    }
-    setShowPins(newShowPins);
+  const togglePinVisibility = () => {
+    setShowPins(!showPins);
   };
 
   const resetModal = () => {
     setFile(null);
-    setMembers([]);
+    setParsedMembers([]);
     setResults(null);
     setProgress(0);
-    setShowPins(new Set());
+    setShowPins(false);
   };
 
   const handleClose = () => {
@@ -210,204 +164,185 @@ export const BulkImportModal = ({ open, onOpenChange, onSuccess }: BulkImportMod
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Import en masse de membres (Excel)</DialogTitle>
+          <DialogTitle>Import groupé de membres</DialogTitle>
         </DialogHeader>
 
         {!results ? (
-          <div className="space-y-6">
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <p className="text-sm text-muted-foreground">
-                  Importez jusqu'à 1000 membres via un fichier Excel (.xlsx)
-                </p>
-                <Button variant="outline" size="sm" onClick={downloadExampleFile}>
-                  <Download className="w-4 h-4 mr-2" />
-                  Télécharger exemple
+          <div className="space-y-4">
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                onClick={downloadExampleFile}
+                className="flex-1"
+              >
+                <Download className="mr-2 h-4 w-4" />
+                Télécharger un exemple
+              </Button>
+              <label className="flex-1">
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => document.getElementById("file-upload")?.click()}
+                >
+                  <Upload className="mr-2 h-4 w-4" />
+                  {file ? file.name : "Choisir un fichier"}
                 </Button>
-              </div>
-
-              <div className="border rounded-lg p-4 space-y-2 bg-muted/50">
-                <p className="font-medium text-sm">Format du fichier Excel :</p>
-                <ul className="text-sm text-muted-foreground list-disc list-inside space-y-1">
-                  <li><strong>Prénom</strong> (obligatoire)</li>
-                  <li><strong>Nom</strong> (obligatoire)</li>
-                  <li><strong>Email</strong> (optionnel - un email fictif sera généré si absent)</li>
-                  <li><strong>Rôle</strong> (optionnel - par défaut: player)</li>
-                </ul>
-              </div>
+                <input
+                  id="file-upload"
+                  type="file"
+                  accept=".xlsx,.xls"
+                  onChange={handleFileChange}
+                  className="hidden"
+                />
+              </label>
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="file-upload">Fichier Excel (.xlsx)</Label>
-              <Input
-                id="file-upload"
-                type="file"
-                accept=".xlsx,.xls"
-                onChange={handleFileChange}
-              />
+            <div className="bg-muted p-4 rounded-lg text-sm space-y-2">
+              <p className="font-semibold flex items-center gap-2">
+                <FileText className="h-4 w-4" />
+                Format du fichier Excel attendu :
+              </p>
+              <ul className="list-disc list-inside space-y-1 ml-6">
+                <li>Colonne <strong>"Nom complet"</strong> : Le nom complet du membre (obligatoire)</li>
+                <li>Colonne <strong>"Email"</strong> : Adresse email (optionnel)</li>
+                <li>Colonne <strong>"Rôle"</strong> : player, coach, super_coach ou admin (optionnel, par défaut: player)</li>
+              </ul>
+              <p className="text-muted-foreground mt-2">
+                Un login et un PIN seront générés automatiquement pour chaque membre.
+              </p>
             </div>
 
-            {members.length > 0 && (
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <p className="text-sm font-medium">
-                    {members.length} membres détectés
-                  </p>
-                </div>
-
-                <div className="border rounded-lg max-h-60 overflow-y-auto">
+            {parsedMembers.length > 0 && (
+              <>
+                <div className="border rounded-lg overflow-hidden">
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>Prénom</TableHead>
-                        <TableHead>Nom</TableHead>
+                        <TableHead>Nom complet</TableHead>
                         <TableHead>Email</TableHead>
                         <TableHead>Rôle</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {members.slice(0, 10).map((member, index) => (
+                      {parsedMembers.slice(0, 10).map((member, index) => (
                         <TableRow key={index}>
-                          <TableCell>{member.firstName}</TableCell>
-                          <TableCell>{member.lastName}</TableCell>
-                          <TableCell className="text-muted-foreground">
-                            {member.email || "(auto)"}
-                          </TableCell>
+                          <TableCell>{member.fullName}</TableCell>
+                          <TableCell>{member.email || "Auto-généré"}</TableCell>
                           <TableCell>{member.role}</TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
                   </Table>
-                  {members.length > 10 && (
-                    <p className="text-xs text-center text-muted-foreground py-2">
-                      ... et {members.length - 10} autres membres
-                    </p>
+                  {parsedMembers.length > 10 && (
+                    <div className="p-2 text-center text-sm text-muted-foreground border-t">
+                      ... et {parsedMembers.length - 10} autres membres
+                    </div>
                   )}
                 </div>
 
-                {importing && (
-                  <div className="space-y-2">
-                    <Progress value={progress} />
-                    <p className="text-sm text-center text-muted-foreground">
-                      Import en cours...
-                    </p>
-                  </div>
-                )}
-
-                <Button
-                  onClick={handleImport}
-                  disabled={importing}
-                  className="w-full"
-                >
-                  <Upload className="w-4 h-4 mr-2" />
-                  {importing ? "Import en cours..." : `Importer ${members.length} membres`}
-                </Button>
-              </div>
+                <div className="flex gap-2">
+                  <Button
+                    onClick={handleImport}
+                    disabled={importing}
+                    className="flex-1"
+                  >
+                    {importing ? `Import en cours... ${progress}%` : `Importer ${parsedMembers.length} membres`}
+                  </Button>
+                  <Button variant="outline" onClick={resetModal}>
+                    Annuler
+                  </Button>
+                </div>
+              </>
             )}
           </div>
         ) : (
-          <div className="space-y-6">
-            <div className="bg-muted/50 rounded-lg p-4">
-              <h3 className="font-semibold mb-2">Résumé de l'import</h3>
-              <div className="grid grid-cols-3 gap-4 text-sm">
-                <div>
-                  <p className="text-muted-foreground">Total</p>
-                  <p className="text-2xl font-bold">{results.summary.total}</p>
-                </div>
-                <div>
-                  <p className="text-muted-foreground">Réussis</p>
-                  <p className="text-2xl font-bold text-green-600">{results.summary.succeeded}</p>
-                </div>
-                <div>
-                  <p className="text-muted-foreground">Erreurs</p>
-                  <p className="text-2xl font-bold text-red-600">{results.summary.failed}</p>
-                </div>
+          <div className="space-y-4">
+            <div className="grid grid-cols-3 gap-4 text-center">
+              <div className="p-4 border rounded-lg">
+                <p className="text-2xl font-bold">{results.success.length}</p>
+                <p className="text-sm text-muted-foreground">Réussis</p>
+              </div>
+              <div className="p-4 border rounded-lg">
+                <p className="text-2xl font-bold">{results.errors.length}</p>
+                <p className="text-sm text-muted-foreground">Erreurs</p>
+              </div>
+              <div className="p-4 border rounded-lg">
+                <p className="text-2xl font-bold">{parsedMembers.length}</p>
+                <p className="text-sm text-muted-foreground">Total</p>
               </div>
             </div>
 
             {results.success.length > 0 && (
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="font-semibold">Identifiants générés</h3>
-                  <Button variant="outline" size="sm" onClick={() => downloadCredentials(results.success)}>
-                    <Download className="w-4 h-4 mr-2" />
-                    Télécharger Excel
+              <>
+                <div className="flex justify-between items-center">
+                  <h3 className="font-semibold">Membres créés avec succès</h3>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={togglePinVisibility}
+                  >
+                    {showPins ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                   </Button>
                 </div>
-
-                <div className="border rounded-lg max-h-96 overflow-y-auto">
+                <div className="border rounded-lg overflow-hidden max-h-64 overflow-y-auto">
                   <Table>
                     <TableHeader>
                       <TableRow>
+                        <TableHead>Nom complet</TableHead>
                         <TableHead>Login</TableHead>
-                        <TableHead>Code PIN</TableHead>
-                        <TableHead>Prénom</TableHead>
-                        <TableHead>Nom</TableHead>
+                        <TableHead>PIN</TableHead>
+                        <TableHead>Rôle</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {results.success.map((member, index) => (
+                      {results.success.map((result, index) => (
                         <TableRow key={index}>
-                          <TableCell className="font-mono">{member.login}</TableCell>
-                          <TableCell>
-                            <div className="flex items-center gap-2">
-                              <span className="font-mono">
-                                {showPins.has(index) ? member.pin : "••••"}
-                              </span>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => togglePinVisibility(index)}
-                              >
-                                {showPins.has(index) ? (
-                                  <EyeOff className="w-4 h-4" />
-                                ) : (
-                                  <Eye className="w-4 h-4" />
-                                )}
-                              </Button>
-                            </div>
+                          <TableCell>{result.fullName}</TableCell>
+                          <TableCell className="font-mono">{result.login}</TableCell>
+                          <TableCell className="font-mono">
+                            {showPins ? result.pin : "****"}
                           </TableCell>
-                          <TableCell>{member.firstName}</TableCell>
-                          <TableCell>{member.lastName}</TableCell>
+                          <TableCell>{result.role}</TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
                   </Table>
                 </div>
-              </div>
+                <Button onClick={downloadCredentials} className="w-full">
+                  <Download className="mr-2 h-4 w-4" />
+                  Télécharger les identifiants
+                </Button>
+              </>
             )}
 
             {results.errors.length > 0 && (
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="font-semibold text-red-600">Erreurs ({results.errors.length})</h3>
-                  <Button variant="outline" size="sm" onClick={downloadErrors}>
-                    <Download className="w-4 h-4 mr-2" />
-                    Télécharger erreurs
-                  </Button>
-                </div>
-
-                <div className="border rounded-lg max-h-60 overflow-y-auto">
+              <>
+                <h3 className="font-semibold text-destructive">Erreurs</h3>
+                <div className="border rounded-lg overflow-hidden max-h-48 overflow-y-auto">
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>Ligne</TableHead>
-                        <TableHead>Nom</TableHead>
+                        <TableHead>Nom complet</TableHead>
+                        <TableHead>Email</TableHead>
                         <TableHead>Erreur</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {results.errors.map((error, index) => (
                         <TableRow key={index}>
-                          <TableCell>{error.index}</TableCell>
-                          <TableCell>{error.firstName} {error.lastName}</TableCell>
-                          <TableCell className="text-red-600 text-sm">{error.error}</TableCell>
+                          <TableCell>{error.fullName}</TableCell>
+                          <TableCell>{error.email}</TableCell>
+                          <TableCell className="text-sm text-destructive">{error.error}</TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
                   </Table>
                 </div>
-              </div>
+                <Button variant="outline" onClick={downloadErrors} className="w-full">
+                  <Download className="mr-2 h-4 w-4" />
+                  Télécharger les erreurs
+                </Button>
+              </>
             )}
 
             <Button onClick={handleClose} className="w-full">

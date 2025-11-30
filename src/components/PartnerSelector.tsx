@@ -27,8 +27,7 @@ interface PartnerSelectorProps {
 
 interface Partner {
   id: string;
-  first_name: string;
-  last_name: string;
+  full_name: string;
   email: string;
 }
 
@@ -83,12 +82,12 @@ export function PartnerSelector({
     setCoachRoles(coachMap);
 
     // Load all partners except current user and admins (include coaches)
-    const { data: profiles } = await supabase
-      .from("profiles")
-      .select("*")
-      .neq("id", userId)
-      .not("id", "in", `(${adminIds.join(",")})`)
-      .order("first_name");
+      const { data: profiles } = await supabase
+        .from("profiles")
+        .select("*")
+        .neq("id", userId)
+        .not("id", "in", `(${adminIds.join(",")})`)
+        .order("full_name");
 
     if (profiles) {
       setAllPartners(profiles);
@@ -167,9 +166,8 @@ export function PartnerSelector({
     const query = searchQuery.toLowerCase();
     return partners.filter(
       (p) =>
-        p.first_name.toLowerCase().includes(query) ||
-        p.last_name.toLowerCase().includes(query) ||
-        `${p.first_name} ${p.last_name}`.toLowerCase().includes(query)
+        p.full_name.toLowerCase().includes(query) ||
+        p.email.toLowerCase().includes(query)
     );
   };
 
@@ -185,7 +183,7 @@ export function PartnerSelector({
           className="w-full justify-between"
         >
           {selectedPartner
-            ? `${selectedPartner.first_name} ${selectedPartner.last_name}`
+            ? selectedPartner.full_name
             : "Sélectionnez un partenaire"}
           <Search className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
@@ -214,7 +212,7 @@ export function PartnerSelector({
                     className="flex items-center justify-between"
                   >
                     <span className={cn(value === partner.id && "font-medium")}>
-                      {partner.first_name} {partner.last_name}
+                      {partner.full_name}
                       {coachRoles.get(partner.id) === 'coach' && ' 🎾'}
                       {coachRoles.get(partner.id) === 'super_coach' && ' ⭐🎾'}
                     </span>
@@ -246,7 +244,7 @@ export function PartnerSelector({
                       className="flex items-center justify-between"
                     >
                       <span className={cn(value === partner.id && "font-medium")}>
-                        {partner.first_name} {partner.last_name}
+                        {partner.full_name}
                         {coachRoles.get(partner.id) === 'coach' && ' 🎾'}
                         {coachRoles.get(partner.id) === 'super_coach' && ' ⭐🎾'}
                       </span>
@@ -278,7 +276,7 @@ export function PartnerSelector({
                     className="flex items-center justify-between"
                   >
                     <span className={cn(value === partner.id && "font-medium")}>
-                      {partner.first_name} {partner.last_name}
+                      {partner.full_name}
                       {coachRoles.get(partner.id) === 'coach' && ' 🎾'}
                       {coachRoles.get(partner.id) === 'super_coach' && ' ⭐🎾'}
                     </span>

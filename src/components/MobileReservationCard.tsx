@@ -11,8 +11,8 @@ interface MobileReservationCardProps {
     start_time: string;
     end_time: string;
     court?: { name: string };
-    player1?: { id: string; first_name: string; last_name: string };
-    player2?: { id: string; first_name: string; last_name: string };
+    player1?: { id: string; full_name: string };
+    player2?: { id: string; full_name: string };
   };
   userId: string;
   onCancel: (id: string) => void;
@@ -27,8 +27,8 @@ export function MobileReservationCard({
 }: MobileReservationCardProps) {
   const partnerName =
     reservation.player1?.id === userId
-      ? `${reservation.player2?.first_name} ${reservation.player2?.last_name}`
-      : `${reservation.player1?.first_name} ${reservation.player1?.last_name}`;
+      ? reservation.player2?.full_name
+      : reservation.player1?.full_name;
 
   return (
     <Card className="p-4 space-y-3 active:bg-accent/50 transition-colors">

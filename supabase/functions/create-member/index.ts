@@ -47,7 +47,7 @@ Deno.serve(async (req) => {
       })
     }
 
-    const { email, password, firstName, lastName, role } = await req.json()
+    const { email, password, fullName, role } = await req.json()
 
     // Valider le rôle
     const validRoles = ['player', 'admin', 'coach', 'super_coach']
@@ -64,8 +64,7 @@ Deno.serve(async (req) => {
       password,
       email_confirm: true,
       user_metadata: {
-        first_name: firstName,
-        last_name: lastName,
+        full_name: fullName,
       }
     })
 
