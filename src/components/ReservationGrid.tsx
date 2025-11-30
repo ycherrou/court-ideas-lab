@@ -15,8 +15,8 @@ interface Reservation {
   court_id: string;
   start_time: string;
   end_time: string;
-  player1: { first_name: string; last_name: string };
-  player2: { first_name: string; last_name: string };
+  player1: { full_name: string };
+  player2: { full_name: string };
 }
 
 interface BlockedSlot {
@@ -91,8 +91,8 @@ export const ReservationGrid = ({
             court_id,
             start_time,
             end_time,
-            player1:player1_id(first_name, last_name),
-            player2:player2_id(first_name, last_name)
+            player1:player1_id(full_name),
+            player2:player2_id(full_name)
           `
           )
           .eq("date", dateString),
@@ -138,7 +138,7 @@ export const ReservationGrid = ({
     if (reservation) {
       const isMyReservation =
         userId &&
-        (reservation.player1?.first_name || reservation.player2?.first_name);
+        (reservation.player1?.full_name || reservation.player2?.full_name);
 
       return (
         <div
@@ -148,11 +148,11 @@ export const ReservationGrid = ({
         >
           <div>
             <div className="font-medium">
-              {reservation.player1?.first_name} {reservation.player1?.last_name}
+              {reservation.player1?.full_name}
             </div>
             <div className="text-muted-foreground">&</div>
             <div className="font-medium">
-              {reservation.player2?.first_name} {reservation.player2?.last_name}
+              {reservation.player2?.full_name}
             </div>
           </div>
         </div>

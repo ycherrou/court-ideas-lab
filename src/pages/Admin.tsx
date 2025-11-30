@@ -20,8 +20,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { z } from "zod";
 
 const newMemberSchema = z.object({
-  firstName: z.string().min(2, "Le prénom doit contenir au moins 2 caractères"),
-  lastName: z.string().min(2, "Le nom doit contenir au moins 2 caractères"),
+  fullName: z.string().min(2, "Le nom complet doit contenir au moins 2 caractères"),
   email: z.string().email("Email invalide"),
   password: z.string().min(6, "Le mot de passe doit contenir au moins 6 caractères"),
 });
@@ -67,8 +66,8 @@ const Admin = () => {
           .select(`
             *,
             court:courts(name),
-            player1:player1_id(first_name, last_name),
-            player2:player2_id(first_name, last_name)
+            player1:player1_id(full_name),
+            player2:player2_id(full_name)
           `)
           .gte("date", new Date().toISOString().split("T")[0])
           .order("date")
@@ -145,8 +144,7 @@ const Admin = () => {
     const formData = new FormData(e.currentTarget);
 
     const data = {
-      firstName: formData.get("firstName") as string,
-      lastName: formData.get("lastName") as string,
+      fullName: formData.get("fullName") as string,
       email: formData.get("email") as string,
       password: formData.get("password") as string,
       role: formData.get("role") as string,
@@ -194,8 +192,7 @@ const Admin = () => {
     const formData = new FormData(e.currentTarget);
 
     const data = {
-      first_name: formData.get("firstName") as string,
-      last_name: formData.get("lastName") as string,
+      full_name: formData.get("fullName") as string,
       email: formData.get("email") as string,
     };
 
@@ -349,7 +346,7 @@ const Admin = () => {
   };
 
   const filteredMembers = members.filter((member) => {
-    const fullName = `${member.first_name} ${member.last_name}`.toLowerCase();
+    const fullName = member.full_name.toLowerCase();
     return fullName.includes(searchQuery.toLowerCase());
   });
 
@@ -426,12 +423,8 @@ const Admin = () => {
                         </DialogHeader>
                         <form onSubmit={handleAddMember} className="space-y-4">
                           <div>
-                            <Label htmlFor="firstName">Prénom</Label>
-                            <Input id="firstName" name="firstName" required />
-                          </div>
-                          <div>
-                            <Label htmlFor="lastName">Nom</Label>
-                            <Input id="lastName" name="lastName" required />
+                            <Label htmlFor="fullName">Nom complet</Label>
+                            <Input id="fullName" name="fullName" required />
                           </div>
                           <div>
                             <Label htmlFor="email">Email</Label>
@@ -504,7 +497,7 @@ const Admin = () => {
                           />
                         </TableCell>
                         <TableCell>
-                          {member.first_name} {member.last_name}
+                          {member.full_name}
                           {member.must_change_password && (
                             <span className="ml-2 text-xs bg-orange-100 text-orange-800 px-2 py-1 rounded">
                               Nouveau
@@ -585,20 +578,11 @@ const Admin = () => {
                 {selectedMember && (
                   <form onSubmit={handleEditMember} className="space-y-4">
                     <div>
-                      <Label htmlFor="edit-firstName">Prénom</Label>
+                      <Label htmlFor="edit-fullName">Nom complet</Label>
                       <Input
-                        id="edit-firstName"
-                        name="firstName"
-                        defaultValue={selectedMember.first_name}
-                        required
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="edit-lastName">Nom</Label>
-                      <Input
-                        id="edit-lastName"
-                        name="lastName"
-                        defaultValue={selectedMember.last_name}
+                        id="edit-fullName"
+                        name="fullName"
+                        defaultValue={selectedMember.full_name}
                         required
                       />
                     </div>
@@ -666,7 +650,7 @@ const Admin = () => {
                         </TableCell>
                         <TableCell>{res.court?.name}</TableCell>
                         <TableCell>
-                          {res.player1?.first_name} {res.player1?.last_name} & {res.player2?.first_name} {res.player2?.last_name}
+                          {res.player1?.full_name} & {res.player2?.full_name}
                         </TableCell>
                         <TableCell>
                           <Button

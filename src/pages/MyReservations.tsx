@@ -40,8 +40,8 @@ const MyReservations = () => {
         .select(`
           *,
           court:courts(name),
-          player1:player1_id(first_name, last_name),
-          player2:player2_id(first_name, last_name)
+          player1:player1_id(full_name),
+          player2:player2_id(full_name)
         `);
 
       // Si l'utilisateur n'est pas admin, filtrer par ses réservations
@@ -160,10 +160,10 @@ const MyReservations = () => {
                       </p>
                       <p className="text-sm">
                         {isAdmin 
-                          ? `${res.player1?.first_name} ${res.player1?.last_name} vs ${res.player2?.first_name} ${res.player2?.last_name}`
+                          ? `${res.player1?.full_name} vs ${res.player2?.full_name}`
                           : `Avec ${res.player1?.id === user.id 
-                              ? `${res.player2?.first_name} ${res.player2?.last_name}`
-                              : `${res.player1?.first_name} ${res.player1?.last_name}`
+                              ? res.player2?.full_name
+                              : res.player1?.full_name
                             }`
                         }
                       </p>
@@ -242,10 +242,10 @@ const MyReservations = () => {
                       </p>
                       <p className="text-sm">
                         {isAdmin 
-                          ? `${res.player1?.first_name} ${res.player1?.last_name} vs ${res.player2?.first_name} ${res.player2?.last_name}`
+                          ? `${res.player1?.full_name} vs ${res.player2?.full_name}`
                           : `Avec ${res.player1?.id === user.id 
-                              ? `${res.player2?.first_name} ${res.player2?.last_name}`
-                              : `${res.player1?.first_name} ${res.player1?.last_name}`
+                              ? res.player2?.full_name
+                              : res.player1?.full_name
                             }`
                         }
                       </p>

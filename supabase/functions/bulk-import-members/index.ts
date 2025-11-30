@@ -1,235 +1,284 @@
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { corsHeaders } from "../_shared/cors.ts";
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.75.0'
+import { corsHeaders } from '../_shared/cors.ts'
 
 Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', { headers: corsHeaders })
   }
 
   try {
-    const supabaseAdmin = createClient(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
-      {
-        auth: {
-          autoRefreshToken: false,
-          persistSession: false,
-        },
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!
+    const supabaseServiceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+    
+    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceRoleKey, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false
       }
-    );
+    })
 
-    const authHeader = req.headers.get("Authorization");
-    if (!authHeader) {
-      throw new Error("Non autorisé");
+    // Verify the caller is an admin
+    const authHeader = req.headers.get('Authorization')!
+    const token = authHeader.replace('Bearer ', '')
+    const supabaseClient = createClient(supabaseUrl, Deno.env.get('SUPABASE_ANON_KEY')!, {
+      global: { headers: { Authorization: authHeader } }
+    })
+    
+    const { data: { user }, error: authError } = await supabaseClient.auth.getUser(token)
+    if (authError || !user) {
+      console.error('Auth error:', authError)
+      return new Response(JSON.stringify({ error: 'Non autorisé' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      })
     }
 
-    const token = authHeader.replace("Bearer ", "");
-    const {
-      data: { user },
-      error: userError,
-    } = await supabaseAdmin.auth.getUser(token);
+    // Check if user is admin
+    const { data: roleData } = await supabaseClient
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', user.id)
+      .eq('role', 'admin')
+      .maybeSingle()
 
-    if (userError || !user) {
-      throw new Error("Non autorisé");
+    if (!roleData) {
+      console.error('User is not admin')
+      return new Response(JSON.stringify({ error: 'Accès non autorisé - Admin requis' }), {
+        status: 403,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      })
     }
 
-    // Vérifier que l'utilisateur est admin
-    const { data: roles } = await supabaseAdmin
-      .from("user_roles")
-      .select("role")
-      .eq("user_id", user.id)
-      .eq("role", "admin")
-      .maybeSingle();
+    const { members } = await req.json()
 
-    if (!roles) {
-      throw new Error("Accès réservé aux administrateurs");
+    if (!Array.isArray(members)) {
+      return new Response(JSON.stringify({ error: 'Format invalide: members doit être un tableau' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      })
     }
 
-    const { members } = await req.json();
-
-    if (!Array.isArray(members) || members.length === 0) {
-      throw new Error("Aucun membre à importer");
+    if (members.length === 0) {
+      return new Response(JSON.stringify({ error: 'Aucun membre à importer' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      })
     }
 
-    if (members.length > 1000) {
-      throw new Error("Maximum 1000 membres par import");
+    if (members.length > 100) {
+      return new Response(JSON.stringify({ error: 'Maximum 100 membres par import' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      })
     }
 
-    console.log(`Début de l'import de ${members.length} membres`);
+    console.log(`Starting import of ${members.length} members...`)
 
-    // Fonction de normalisation
+    // Fonction helper pour normaliser les chaînes
     const normalizeString = (str: string): string => {
       return str
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
         .toLowerCase()
-        .normalize('NFD')
-        .replace(/[\u0300-\u036f]/g, '')
-        .replace(/[^a-z0-9]/g, '')
-        .trim();
+        .replace(/[^a-z0-9]/g, "");
     };
 
-    // Fonction de génération de login
-    const generateLogin = (firstName: string, lastName: string, existingLogins: Set<string>): string => {
-      const normalizedFirst = normalizeString(firstName);
-      const normalizedLast = normalizeString(lastName);
+    // Fonction pour générer un login à partir du nom complet
+    const generateLogin = (fullName: string, existingUsernames: Set<string>): string => {
+      const normalized = normalizeString(fullName);
+      const words = normalized.split(/\s+/).filter(w => w.length > 0);
       
-      if (!normalizedFirst || !normalizedLast) {
-        throw new Error(`Nom invalide: ${firstName} ${lastName}`);
+      if (words.length === 0) {
+        // Fallback si le nom est vide ou invalide
+        let baseLogin = 'user';
+        let counter = 1;
+        let login = baseLogin;
+        while (existingUsernames.has(login)) {
+          login = `${baseLogin}${counter}`;
+          counter++;
+        }
+        return login;
       }
 
-      let baseLogin = `${normalizedFirst[0]}${normalizedLast}`;
+      // Prendre la première lettre du premier mot + le reste des mots
+      const firstLetter = words[0][0];
+      const restOfName = words.slice(1).join('');
+      
+      let baseLogin = firstLetter + restOfName;
+      
+      // S'assurer que le login est unique
       let login = baseLogin;
-      let counter = 2;
-
-      while (existingLogins.has(login)) {
+      let counter = 1;
+      while (existingUsernames.has(login)) {
         login = `${baseLogin}${counter}`;
         counter++;
       }
-
-      existingLogins.add(login);
+      
       return login;
     };
 
-    // Fonction de génération de PIN
+    // Fonction pour générer un PIN de 4 chiffres
     const generatePIN = (): string => {
       return Math.floor(1000 + Math.random() * 9000).toString();
     };
 
-    // Récupérer tous les logins existants
+    // Récupérer tous les usernames existants
     const { data: existingProfiles } = await supabaseAdmin
-      .from("profiles")
-      .select("username");
-
-    const existingLogins = new Set<string>(
-      (existingProfiles || []).map(p => p.username).filter(Boolean)
+      .from('profiles')
+      .select('username');
+    
+    const existingUsernames = new Set(
+      existingProfiles?.map(p => p.username).filter(Boolean) || []
     );
 
-    const success: Array<{
-      login: string;
-      pin: string;
-      firstName: string;
-      lastName: string;
-      email: string;
-      role: string;
-    }> = [];
+    const validRoles = ['player', 'admin', 'coach', 'super_coach'];
+    const results = [];
+    const errors = [];
 
-    const errors: Array<{
-      index: number;
-      firstName: string;
-      lastName: string;
-      error: string;
-    }> = [];
-
-    // Traiter chaque membre
-    for (let i = 0; i < members.length; i++) {
-      const member = members[i];
-      
+    for (const member of members) {
       try {
-        const firstName = member.firstName?.trim();
-        const lastName = member.lastName?.trim();
-        const role = member.role || 'player';
-        
-        if (!firstName || !lastName) {
-          throw new Error("Prénom et nom requis");
+        const { fullName, email, role } = member;
+
+        // Validation
+        if (!fullName || fullName.trim() === '') {
+          errors.push({
+            fullName: fullName || 'Non spécifié',
+            email: email || 'Non spécifié',
+            error: 'Le nom complet est requis'
+          });
+          continue;
         }
+
+        // Valider le rôle
+        const assignedRole = role && validRoles.includes(role.toLowerCase()) 
+          ? role.toLowerCase() 
+          : 'player';
 
         // Générer login et PIN
-        const login = generateLogin(firstName, lastName, existingLogins);
+        const login = generateLogin(fullName, existingUsernames);
+        existingUsernames.add(login); // Ajouter à la liste pour éviter les doublons
         const pin = generatePIN();
 
-        // Générer email si non fourni
-        const email = member.email?.trim() || `${login}@tennisclub.local`;
+        // Créer l'utilisateur avec un mot de passe temporaire fort
+        const tempPassword = `Temp${pin}${crypto.randomUUID()}!`;
+        
+        const userEmail = email && email.trim() !== '' 
+          ? email 
+          : `${login}@tempmail.com`;
 
-        console.log(`Création du membre ${i + 1}/${members.length}: ${login}`);
+        console.log(`Creating user: ${login} (${fullName}) with email ${userEmail}`);
 
-        // Créer l'utilisateur
-        const { data: newUser, error: createError } = await supabaseAdmin.auth.admin.createUser({
-          email,
-          password: pin,
+        const { data: userData, error: userError } = await supabaseAdmin.auth.admin.createUser({
+          email: userEmail,
+          password: tempPassword,
           email_confirm: true,
           user_metadata: {
-            first_name: firstName,
-            last_name: lastName,
-          },
+            full_name: fullName,
+          }
         });
 
-        if (createError) {
-          throw createError;
+        if (userError) {
+          console.error(`Error creating user ${login}:`, userError);
+          errors.push({
+            fullName,
+            email: userEmail,
+            error: userError.message
+          });
+          continue;
         }
 
-        if (!newUser.user) {
-          throw new Error("Échec de création de l'utilisateur");
+        if (!userData.user) {
+          console.error(`No user data returned for ${login}`);
+          errors.push({
+            fullName,
+            email: userEmail,
+            error: 'Aucune donnée utilisateur retournée'
+          });
+          continue;
+        }
+
+        // Mettre à jour le profil avec le username et le PIN
+        const { error: profileError } = await supabaseAdmin
+          .from('profiles')
+          .update({
+            username: login,
+            temporary_pin: pin,
+            must_change_password: true
+          })
+          .eq('id', userData.user.id);
+
+        if (profileError) {
+          console.error(`Error updating profile for ${login}:`, profileError);
+          // On continue quand même car l'utilisateur est créé
         }
 
         // Assigner le rôle
         const { error: roleError } = await supabaseAdmin
-          .from("user_roles")
-          .insert({
-            user_id: newUser.user.id,
-            role: role,
-          });
+          .from('user_roles')
+          .delete()
+          .eq('user_id', userData.user.id);
 
         if (roleError) {
-          console.error(`Erreur rôle pour ${login}:`, roleError);
+          console.error(`Error deleting existing roles for ${login}:`, roleError);
         }
 
-        // Mettre à jour le profil avec username, PIN et must_change_password
-        const { error: profileError } = await supabaseAdmin
-          .from("profiles")
-          .update({
-            username: login,
-            temporary_pin: pin,
-            must_change_password: true,
-          })
-          .eq("id", newUser.user.id);
+        const { error: insertRoleError } = await supabaseAdmin
+          .from('user_roles')
+          .insert({
+            user_id: userData.user.id,
+            role: assignedRole
+          });
 
-        if (profileError) {
-          console.error(`Erreur profil pour ${login}:`, profileError);
+        if (insertRoleError) {
+          console.error(`Error assigning role for ${login}:`, insertRoleError);
         }
 
-        success.push({
+        console.log(`Successfully created user: ${login} with role ${assignedRole}`);
+
+        results.push({
           login,
           pin,
-          firstName,
-          lastName,
-          email,
-          role,
+          fullName,
+          email: userEmail,
+          role: assignedRole
         });
 
       } catch (error) {
-        console.error(`Erreur membre ${i + 1}:`, error);
+        console.error('Error processing member:', error);
         errors.push({
-          index: i + 1,
-          firstName: member.firstName || '',
-          lastName: member.lastName || '',
-          error: error instanceof Error ? error.message : 'Erreur inconnue',
+          fullName: member.fullName || 'Inconnu',
+          email: member.email || 'Non spécifié',
+          error: error instanceof Error ? error.message : 'Erreur inconnue'
         });
       }
     }
 
-    console.log(`Import terminé: ${success.length} réussites, ${errors.length} erreurs`);
+    console.log(`Import completed: ${results.length} success, ${errors.length} errors`);
 
     return new Response(
       JSON.stringify({
-        success,
-        errors,
+        success: results,
+        errors: errors,
         summary: {
           total: members.length,
-          succeeded: success.length,
-          failed: errors.length,
-        },
+          successful: results.length,
+          failed: errors.length
+        }
       }),
       {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
         status: 200,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       }
     );
+
   } catch (error) {
-    console.error("Erreur globale:", error);
+    console.error('Global error:', error);
+    const message = error instanceof Error ? error.message : 'Une erreur est survenue';
     return new Response(
-      JSON.stringify({ error: error instanceof Error ? error.message : "Erreur inconnue" }),
+      JSON.stringify({ error: message }),
       {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-        status: 400,
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       }
     );
   }
