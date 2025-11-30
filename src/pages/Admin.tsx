@@ -59,6 +59,13 @@ const Admin = () => {
 
   const fetchData = async () => {
     try {
+      // Fix timezone issue - use local date
+      const now = new Date();
+      const todayYear = now.getFullYear();
+      const todayMonth = String(now.getMonth() + 1).padStart(2, '0');
+      const todayDay = String(now.getDate()).padStart(2, '0');
+      const today = `${todayYear}-${todayMonth}-${todayDay}`;
+      
       const [membersData, reservationsData, blockedData, courtsData] = await Promise.all([
         supabase.from("profiles").select("*").order("created_at", { ascending: false }),
         supabase
@@ -69,7 +76,7 @@ const Admin = () => {
             player1:player1_id(full_name),
             player2:player2_id(full_name)
           `)
-          .gte("date", new Date().toISOString().split("T")[0])
+          .gte("date", today)
           .order("date")
           .order("start_time"),
         supabase.from("blocked_slots").select("*, court:courts(name)").order("date"),
@@ -95,7 +102,7 @@ const Admin = () => {
       // Filtrer les réservations passées
       if (reservationsData.data) {
         const now = new Date();
-        const currentDate = now.toISOString().split("T")[0];
+        const currentDate = today; // Use the same today variable defined above
         const currentTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}:00`;
         
         const futureReservations = reservationsData.data.filter((res: any) => {

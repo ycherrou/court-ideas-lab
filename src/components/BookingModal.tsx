@@ -136,12 +136,23 @@ export const BookingModal = ({
     
     // Check for active reservation (pas pour les admins créant pour les coachs)
     if (!isAdmin) {
-      const dateStr = format(date, "yyyy-MM-dd");
+      // Fix timezone issue for date comparison
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      const dateStr = `${year}-${month}-${day}`;
+      
+      const today = new Date();
+      const todayYear = today.getFullYear();
+      const todayMonth = String(today.getMonth() + 1).padStart(2, '0');
+      const todayDay = String(today.getDate()).padStart(2, '0');
+      const todayStr = `${todayYear}-${todayMonth}-${todayDay}`;
+      
       const { data: activeRes } = await supabase
         .from("reservations")
         .select("*")
         .or(`player1_id.eq.${userId},player2_id.eq.${userId}`)
-        .gte("date", format(new Date(), "yyyy-MM-dd"));
+        .gte("date", todayStr);
 
       if (activeRes && activeRes.length > 0) {
         toast.error("Vous avez déjà une réservation active");
@@ -158,7 +169,12 @@ export const BookingModal = ({
     const dateToUse = date || selectedDate;
     if (!dateToUse) return;
 
-    const dateStr = format(dateToUse, "yyyy-MM-dd");
+    // Fix timezone issue
+    const year = dateToUse.getFullYear();
+    const month = String(dateToUse.getMonth() + 1).padStart(2, '0');
+    const day = String(dateToUse.getDate()).padStart(2, '0');
+    const dateStr = `${year}-${month}-${day}`;
+    
     const [courtsData, reservations, blocked, profiles] = await Promise.all([
       supabase.from("courts").select("*").order("court_number"),
       supabase.from("reservations").select("*").eq("date", dateStr),
@@ -190,7 +206,11 @@ export const BookingModal = ({
 
     setLoading(true);
     try {
-      const dateStr = format(selectedDate, "yyyy-MM-dd");
+      // Fix timezone issue: use local date without timezone conversion
+      const year = selectedDate.getFullYear();
+      const month = String(selectedDate.getMonth() + 1).padStart(2, '0');
+      const day = String(selectedDate.getDate()).padStart(2, '0');
+      const dateStr = `${year}-${month}-${day}`;
       const [hourStr] = selectedTime.split(":");
       const hour = parseInt(hourStr);
       const endTime = `${(hour + 1).toString().padStart(2, "0")}:00:00`;
