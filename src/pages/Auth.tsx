@@ -5,14 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { z } from "zod";
-
-const loginSchema = z.object({
-  email: z.string().email("Email invalide"),
-  password: z.string().min(6, "Le mot de passe doit contenir au moins 6 caractères"),
-});
 
 const usernameLoginSchema = z.object({
   username: z.string().min(2, "Login invalide"),
@@ -33,37 +27,6 @@ const Auth = () => {
     checkUser();
   }, [navigate]);
 
-  const handleEmailLogin = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    setLoading(true);
-
-    const formData = new FormData(e.currentTarget);
-    const email = formData.get("email") as string;
-    const password = formData.get("password") as string;
-
-    try {
-      loginSchema.parse({ email, password });
-
-      const { error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-
-      if (error) throw error;
-
-      toast.success("Connexion réussie !");
-      navigate("/");
-    } catch (error) {
-      if (error instanceof z.ZodError) {
-        toast.error(error.errors[0].message);
-      } else if (error instanceof Error) {
-        toast.error(error.message);
-      }
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const handleUsernameLogin = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setLoading(true);
@@ -75,8 +38,6 @@ const Auth = () => {
     try {
       usernameLoginSchema.parse({ username, password });
 
-      const { data: { session } } = await supabase.auth.getSession();
-      
       const response = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/login-with-username`,
         {
@@ -121,80 +82,42 @@ const Auth = () => {
     }
   };
 
-
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
       <Card className="w-full max-w-md">
         <CardHeader>
           <CardTitle className="text-2xl text-center">Réservation de Courts de Tennis</CardTitle>
           <CardDescription className="text-center">
-            Connectez-vous pour réserver un terrain
+            Connectez-vous avec votre login
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <Tabs defaultValue="email" className="w-full">
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="email">Email</TabsTrigger>
-              <TabsTrigger value="login">Login</TabsTrigger>
-            </TabsList>
-            
-            <TabsContent value="email">
-              <form onSubmit={handleEmailLogin} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="login-email">Email</Label>
-                  <Input
-                    id="login-email"
-                    name="email"
-                    type="email"
-                    placeholder="votre@email.com"
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="login-password">Mot de passe</Label>
-                  <Input
-                    id="login-password"
-                    name="password"
-                    type="password"
-                    placeholder="••••••"
-                    required
-                  />
-                </div>
-                <Button type="submit" className="w-full" disabled={loading}>
-                  {loading ? "Connexion..." : "Se connecter"}
-                </Button>
-              </form>
-            </TabsContent>
-
-            <TabsContent value="login">
-              <form onSubmit={handleUsernameLogin} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="username">Login</Label>
-                  <Input
-                    id="username"
-                    name="username"
-                    type="text"
-                    placeholder="jdupont"
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="pin">Code PIN</Label>
-                  <Input
-                    id="pin"
-                    name="password"
-                    type="password"
-                    placeholder="1234"
-                    maxLength={4}
-                    required
-                  />
-                </div>
-                <Button type="submit" className="w-full" disabled={loading}>
-                  {loading ? "Connexion..." : "Se connecter"}
-                </Button>
-              </form>
-            </TabsContent>
-          </Tabs>
+          <form onSubmit={handleUsernameLogin} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="username">Login</Label>
+              <Input
+                id="username"
+                name="username"
+                type="text"
+                placeholder="jdupont"
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="pin">Code PIN</Label>
+              <Input
+                id="pin"
+                name="password"
+                type="password"
+                placeholder="1234"
+                maxLength={4}
+                required
+              />
+            </div>
+            <Button type="submit" className="w-full" disabled={loading}>
+              {loading ? "Connexion..." : "Se connecter"}
+            </Button>
+          </form>
         </CardContent>
       </Card>
     </div>
