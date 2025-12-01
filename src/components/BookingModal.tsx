@@ -141,6 +141,11 @@ export const BookingModal = ({
 
   const handleDateSelect = async (date: Date | undefined) => {
     if (!date) return;
+    
+    console.log("🔍 DEBUG handleDateSelect - Date reçue:", date);
+    console.log("🔍 DEBUG handleDateSelect - Date ISO:", date.toISOString());
+    console.log("🔍 DEBUG handleDateSelect - Date locale:", date.toLocaleString());
+    
     setSelectedDate(date);
     
     // Check for active reservation (pas pour les admins créant pour les coachs)
