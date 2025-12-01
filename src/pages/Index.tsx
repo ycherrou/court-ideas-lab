@@ -13,12 +13,14 @@ import { Carousel, CarouselContent, CarouselItem, CarouselApi } from "@/componen
 import { addDays, format, startOfWeek } from "date-fns";
 import { fr } from "date-fns/locale";
 import { supabase } from "@/integrations/supabase/client";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 const Index = () => {
   const navigate = useNavigate();
   const { user, loading: authLoading, signOut } = useAuth();
   const { isAdmin, loading: roleLoading } = useUserRole(user?.id);
   const { isCoach } = useCoachRestrictions(user?.id);
+  const isMobile = useIsMobile();
   const [bookingOpen, setBookingOpen] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
   const [prefilledBooking, setPrefilledBooking] = useState<{
@@ -176,6 +178,7 @@ const Index = () => {
             slidesToScroll: 1,
             loop: false,
             dragFree: false,
+            watchDrag: !isMobile,
           }}
         >
           <div className="flex items-center justify-between mb-4">
