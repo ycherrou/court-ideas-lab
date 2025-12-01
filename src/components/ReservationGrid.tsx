@@ -196,8 +196,8 @@ export const ReservationGrid = ({
   const filteredHours = getFilteredHours(date);
 
   return (
-    <ScrollArea className="w-full max-h-[calc(100vh-250px)] md:max-h-[calc(100vh-200px)]">
-      <div className="min-w-max pb-4">
+    <ScrollArea className="w-full h-[calc(100vh-280px)] md:h-[calc(100vh-220px)]">
+      <div className="min-w-max pb-6">
         <div className="grid grid-cols-[50px_repeat(10,80px)] md:grid-cols-[100px_repeat(10,minmax(120px,1fr))] gap-0.5 md:gap-1">
           {/* Empty corner cell - sticky */}
           <div className="font-semibold p-1 md:p-2 bg-muted sticky top-0 left-0 z-20 border-r border-b"></div>
