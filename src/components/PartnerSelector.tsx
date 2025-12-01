@@ -82,12 +82,17 @@ export function PartnerSelector({
     setCoachRoles(coachMap);
 
     // Load all partners except current user and admins (include coaches)
-      const { data: profiles } = await supabase
-        .from("profiles")
-        .select("*")
-        .neq("id", userId)
-        .not("id", "in", `(${adminIds.join(",")})`)
-        .order("full_name");
+    let profilesQuery = supabase
+      .from("profiles")
+      .select("*")
+      .neq("id", userId)
+      .order("full_name");
+
+    if (adminIds.length > 0) {
+      profilesQuery = profilesQuery.not("id", "in", `(${adminIds.join(",")})`);
+    }
+
+    const { data: profiles } = await profilesQuery;
 
     if (profiles) {
       setAllPartners(profiles);
