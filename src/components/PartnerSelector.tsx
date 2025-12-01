@@ -264,7 +264,7 @@ export function PartnerSelector({
             <CommandGroup heading="👥 Tous les membres">
               {filterPartners(allPartners)
                 .filter((p) => !favoriteIds.has(p.id) && !recents.some((r) => r.id === p.id))
-                .slice(0, 50)
+                .slice(0, searchQuery ? 200 : 100)
                 .map((partner) => (
                   <CommandItem
                     key={partner.id}
