@@ -145,10 +145,6 @@ export const BookingModal = ({
     // Normaliser la date à minuit en heure locale pour éviter les problèmes de timezone
     const normalizedDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
     
-    console.log("🔍 DEBUG handleDateSelect - Date reçue du calendrier:", date);
-    console.log("🔍 DEBUG handleDateSelect - Date normalisée:", normalizedDate);
-    console.log("🔍 DEBUG handleDateSelect - ISO:", normalizedDate.toISOString());
-    
     setSelectedDate(normalizedDate);
     
     // Check for active reservation (pas pour les admins créant pour les coachs)
@@ -230,11 +226,6 @@ export const BookingModal = ({
       const day = String(selectedDate.getDate()).padStart(2, '0');
       const dateStr = `${year}-${month}-${day}`;
       
-      console.log("📅 DEBUG - Date sélectionnée:", selectedDate);
-      console.log("📅 DEBUG - Date formatée:", dateStr);
-      console.log("🏟️ DEBUG - Court:", selectedCourt);
-      console.log("⏰ DEBUG - Heure:", selectedTime);
-      
       const [hourStr] = selectedTime.split(":");
       const hour = parseInt(hourStr);
       const endTime = `${(hour + 1).toString().padStart(2, "0")}:00:00`;
@@ -315,12 +306,7 @@ export const BookingModal = ({
         created_by: userId,
       };
       
-      console.log("💾 DEBUG - Données à insérer:", reservationData);
-      
-      const { error, data: insertedData } = await supabase.from("reservations").insert(reservationData).select();
-
-      console.log("✅ DEBUG - Résultat insertion:", insertedData);
-      console.log("❌ DEBUG - Erreur:", error);
+      const { error } = await supabase.from("reservations").insert(reservationData).select();
       
       if (error) throw error;
 
