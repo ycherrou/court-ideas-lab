@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { toast } from "sonner";
 
 interface Court {
@@ -134,7 +135,7 @@ export const ReservationGrid = ({
 
     if (blocked) {
       return (
-        <div className="h-full bg-destructive/20 border-destructive/40 flex items-center justify-center p-1 md:p-2 text-center text-[10px] md:text-xs">
+        <div className="h-full bg-destructive/20 border-destructive/40 flex items-center justify-center p-0.5 md:p-2 text-center text-[8px] md:text-xs">
           <div>
             <div className="font-semibold">BLOQUÉ</div>
             <div className="text-muted-foreground hidden md:block">{blocked.reason}</div>
@@ -151,20 +152,23 @@ export const ReservationGrid = ({
       const isMyReservation =
         userId &&
         (reservation.player1?.full_name || reservation.player2?.full_name);
+      
+      const player1FirstName = reservation.player1?.full_name?.split(' ')[0] || '';
+      const player2FirstName = reservation.player2?.full_name?.split(' ')[0] || '';
 
       return (
         <div
-          className={`h-full flex items-center justify-center p-2 text-center text-xs ${
+          className={`h-full flex items-center justify-center p-0.5 md:p-2 text-center text-[8px] md:text-xs ${
             isMyReservation ? "bg-primary/20 border-primary" : "bg-accent"
           }`}
         >
-          <div>
-            <div className="font-medium">
-              {reservation.player1?.full_name}
+          <div className="leading-tight">
+            <div className="font-medium truncate">
+              {player1FirstName}
             </div>
-            <div className="text-muted-foreground">&</div>
-            <div className="font-medium">
-              {reservation.player2?.full_name}
+            <div className="text-muted-foreground text-[6px] md:text-xs">&</div>
+            <div className="font-medium truncate">
+              {player2FirstName}
             </div>
           </div>
         </div>
@@ -175,11 +179,11 @@ export const ReservationGrid = ({
     return (
       <button
         onClick={() => onSlotClick?.(courtId, courtName, hour)}
-        className="h-full w-full bg-success/10 hover:bg-success/20 active:bg-success/30 border-success/40 flex items-center justify-center text-xs text-muted-foreground transition-colors cursor-pointer"
+        className="h-full w-full bg-success/10 hover:bg-success/20 active:bg-success/30 border-success/40 flex items-center justify-center text-[8px] md:text-xs text-muted-foreground transition-colors cursor-pointer"
       >
-        <div className="flex flex-col items-center gap-1">
+        <div className="flex flex-col items-center">
           <span className="hidden md:block">Disponible</span>
-          <span className="text-[10px] md:hidden">✓</span>
+          <span className="text-sm md:hidden">✓</span>
         </div>
       </button>
     );
@@ -192,19 +196,20 @@ export const ReservationGrid = ({
   const filteredHours = getFilteredHours(date);
 
   return (
-    <div className="overflow-x-auto overflow-y-auto -mx-2 md:mx-0 max-h-[calc(100vh-250px)]">
-      <div className="min-w-max px-2 md:px-0">
-        <div className="grid grid-cols-[60px_repeat(10,minmax(100px,1fr))] md:grid-cols-[100px_repeat(10,minmax(120px,1fr))] gap-1">
+    <ScrollArea className="w-full max-h-[calc(100vh-250px)] md:max-h-[calc(100vh-200px)]">
+      <div className="min-w-max pb-4">
+        <div className="grid grid-cols-[50px_repeat(10,80px)] md:grid-cols-[100px_repeat(10,minmax(120px,1fr))] gap-0.5 md:gap-1">
           {/* Empty corner cell - sticky */}
-          <div className="font-semibold p-1 md:p-2 bg-muted sticky top-0 left-0 z-20"></div>
+          <div className="font-semibold p-1 md:p-2 bg-muted sticky top-0 left-0 z-20 border-r border-b"></div>
           
           {/* Court headers - sticky top */}
           {courts.map((court) => (
             <div 
               key={court.id} 
-              className="font-semibold p-1 md:p-2 bg-muted text-center text-xs md:text-sm sticky top-0 z-10"
+              className="font-semibold p-1 md:p-2 bg-muted text-center text-[10px] md:text-sm sticky top-0 z-10 border-b"
             >
-              {court.name.replace("Terrain ", "T")}
+              <span className="md:hidden">{court.court_number}</span>
+              <span className="hidden md:inline">{court.name.replace("Terrain ", "T")}</span>
             </div>
           ))}
 
@@ -213,14 +218,14 @@ export const ReservationGrid = ({
               {/* Hour labels - sticky left */}
               <div 
                 key={`hour-${hour}`} 
-                className="font-medium p-1 md:p-2 bg-muted text-xs md:text-sm sticky left-0 z-10"
+                className="font-medium p-1 md:p-2 bg-muted text-[10px] md:text-sm flex items-center justify-center sticky left-0 z-10 border-r"
               >
                 {hour}h
               </div>
               
               {/* Court slots */}
               {courts.map((court) => (
-                <Card key={`${court.id}-${hour}`} className="min-h-[60px] md:min-h-[80px] overflow-hidden">
+                <Card key={`${court.id}-${hour}`} className="min-h-[50px] md:min-h-[80px] overflow-hidden border-0 rounded-none">
                   {getSlotContent(court.id, court.name, hour)}
                 </Card>
               ))}
@@ -228,6 +233,8 @@ export const ReservationGrid = ({
           ))}
         </div>
       </div>
-    </div>
+      <ScrollBar orientation="horizontal" />
+      <ScrollBar orientation="vertical" />
+    </ScrollArea>
   );
 };
