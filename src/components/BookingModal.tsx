@@ -142,11 +142,14 @@ export const BookingModal = ({
   const handleDateSelect = async (date: Date | undefined) => {
     if (!date) return;
     
-    console.log("🔍 DEBUG handleDateSelect - Date reçue:", date);
-    console.log("🔍 DEBUG handleDateSelect - Date ISO:", date.toISOString());
-    console.log("🔍 DEBUG handleDateSelect - Date locale:", date.toLocaleString());
+    // Normaliser la date à minuit en heure locale pour éviter les problèmes de timezone
+    const normalizedDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
     
-    setSelectedDate(date);
+    console.log("🔍 DEBUG handleDateSelect - Date reçue du calendrier:", date);
+    console.log("🔍 DEBUG handleDateSelect - Date normalisée:", normalizedDate);
+    console.log("🔍 DEBUG handleDateSelect - ISO:", normalizedDate.toISOString());
+    
+    setSelectedDate(normalizedDate);
     
     // Check for active reservation (pas pour les admins créant pour les coachs)
     if (!isAdmin) {
