@@ -104,13 +104,12 @@ const Auth = () => {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="pin">Code PIN</Label>
+              <Label htmlFor="password">Code PIN ou mot de passe</Label>
               <Input
-                id="pin"
+                id="password"
                 name="password"
                 type="password"
-                placeholder="1234"
-                maxLength={4}
+                placeholder="Code PIN ou mot de passe"
                 required
               />
             </div>
