@@ -245,8 +245,7 @@ export const BookingModal = ({
         return;
       }
 
-      // Verify partner doesn't have an active reservation
-      const partnerId = isAdmin ? selectedPlayer2 : selectedPartner;
+      // Verify both players don't have active reservations
       const today = new Date();
       const todayYear = today.getFullYear();
       const todayMonth = String(today.getMonth() + 1).padStart(2, '0');
@@ -254,14 +253,31 @@ export const BookingModal = ({
       const todayStr = `${todayYear}-${todayMonth}-${todayDay}`;
       const currentTime = `${String(today.getHours()).padStart(2, '0')}:${String(today.getMinutes()).padStart(2, '0')}:00`;
 
-      const { data: partnerActiveRes } = await supabase
+      const player1Id = isAdmin ? selectedPlayer1 : userId;
+      const player2Id = isAdmin ? selectedPlayer2 : selectedPartner;
+
+      // Check player 1
+      const { data: player1ActiveRes } = await supabase
         .from("reservations")
         .select("*")
-        .or(`player1_id.eq.${partnerId},player2_id.eq.${partnerId}`)
+        .or(`player1_id.eq.${player1Id},player2_id.eq.${player1Id}`)
         .or(`date.gt.${todayStr},and(date.eq.${todayStr},start_time.gt.${currentTime})`);
 
-      if (partnerActiveRes && partnerActiveRes.length > 0) {
-        toast.error("Le partenaire sélectionné a déjà une réservation active");
+      if (player1ActiveRes && player1ActiveRes.length > 0) {
+        toast.error(isAdmin ? "Le joueur 1 a déjà une réservation active" : "Vous avez déjà une réservation active");
+        setLoading(false);
+        return;
+      }
+
+      // Check player 2
+      const { data: player2ActiveRes } = await supabase
+        .from("reservations")
+        .select("*")
+        .or(`player1_id.eq.${player2Id},player2_id.eq.${player2Id}`)
+        .or(`date.gt.${todayStr},and(date.eq.${todayStr},start_time.gt.${currentTime})`);
+
+      if (player2ActiveRes && player2ActiveRes.length > 0) {
+        toast.error(isAdmin ? "Le joueur 2 a déjà une réservation active" : "Votre partenaire a déjà une réservation active");
         setLoading(false);
         return;
       }
