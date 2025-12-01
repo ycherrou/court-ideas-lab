@@ -16,6 +16,8 @@ interface Reservation {
   court_id: string;
   start_time: string;
   end_time: string;
+  player1_id: string;
+  player2_id: string;
   player1: { full_name: string };
   player2: { full_name: string };
 }
@@ -104,6 +106,8 @@ export const ReservationGrid = ({
             court_id,
             start_time,
             end_time,
+            player1_id,
+            player2_id,
             player1:player1_id(full_name),
             player2:player2_id(full_name)
           `
@@ -151,7 +155,7 @@ export const ReservationGrid = ({
     if (reservation) {
       const isMyReservation =
         userId &&
-        (reservation.player1?.full_name || reservation.player2?.full_name);
+        (reservation.player1_id === userId || reservation.player2_id === userId);
       
       const player1FirstName = reservation.player1?.full_name?.split(' ')[0] || '';
       const player2FirstName = reservation.player2?.full_name?.split(' ')[0] || '';
