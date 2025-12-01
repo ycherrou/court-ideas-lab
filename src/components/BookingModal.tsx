@@ -221,6 +221,12 @@ export const BookingModal = ({
       const month = String(selectedDate.getMonth() + 1).padStart(2, '0');
       const day = String(selectedDate.getDate()).padStart(2, '0');
       const dateStr = `${year}-${month}-${day}`;
+      
+      console.log("📅 DEBUG - Date sélectionnée:", selectedDate);
+      console.log("📅 DEBUG - Date formatée:", dateStr);
+      console.log("🏟️ DEBUG - Court:", selectedCourt);
+      console.log("⏰ DEBUG - Heure:", selectedTime);
+      
       const [hourStr] = selectedTime.split(":");
       const hour = parseInt(hourStr);
       const endTime = `${(hour + 1).toString().padStart(2, "0")}:00:00`;
@@ -291,7 +297,7 @@ export const BookingModal = ({
         return;
       }
 
-      const { error } = await supabase.from("reservations").insert({
+      const reservationData = {
         court_id: selectedCourt,
         date: dateStr,
         start_time: selectedTime,
@@ -299,8 +305,15 @@ export const BookingModal = ({
         player1_id: isAdmin ? selectedPlayer1 : userId,
         player2_id: isAdmin ? selectedPlayer2 : selectedPartner,
         created_by: userId,
-      });
+      };
+      
+      console.log("💾 DEBUG - Données à insérer:", reservationData);
+      
+      const { error, data: insertedData } = await supabase.from("reservations").insert(reservationData).select();
 
+      console.log("✅ DEBUG - Résultat insertion:", insertedData);
+      console.log("❌ DEBUG - Erreur:", error);
+      
       if (error) throw error;
 
       toast.success("Réservation créée avec succès !");
@@ -310,7 +323,7 @@ export const BookingModal = ({
       // Force page refresh to show new reservation
       window.location.reload();
     } catch (error: any) {
-      console.error("Erreur lors de la création de la réservation", error);
+      console.error("❌ ERREUR DÉTAILLÉE:", error);
       const message = error?.message ?? "";
 
       if (
@@ -321,7 +334,7 @@ export const BookingModal = ({
           "Votre réservation ne peut pas être acceptée car vous avez déjà une réservation active."
         );
       } else {
-        toast.error("Une erreur est survenue lors de la création de la réservation.");
+        toast.error(`Erreur: ${message || "Une erreur est survenue lors de la création de la réservation."}`);
       }
     } finally {
       setLoading(false);
