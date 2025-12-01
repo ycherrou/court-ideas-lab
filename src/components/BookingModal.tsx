@@ -147,12 +147,13 @@ export const BookingModal = ({
       const todayMonth = String(today.getMonth() + 1).padStart(2, '0');
       const todayDay = String(today.getDate()).padStart(2, '0');
       const todayStr = `${todayYear}-${todayMonth}-${todayDay}`;
+      const currentTime = `${String(today.getHours()).padStart(2, '0')}:${String(today.getMinutes()).padStart(2, '0')}:00`;
       
       const { data: activeRes } = await supabase
         .from("reservations")
         .select("*")
         .or(`player1_id.eq.${userId},player2_id.eq.${userId}`)
-        .gte("date", todayStr);
+        .or(`date.gt.${todayStr},and(date.eq.${todayStr},start_time.gt.${currentTime})`);
 
       if (activeRes && activeRes.length > 0) {
         toast.error("Vous avez déjà une réservation active");
@@ -240,6 +241,27 @@ export const BookingModal = ({
 
       if (existingReservations && existingReservations.length > 0) {
         toast.error("Ce créneau est déjà réservé");
+        setLoading(false);
+        return;
+      }
+
+      // Verify partner doesn't have an active reservation
+      const partnerId = isAdmin ? selectedPlayer2 : selectedPartner;
+      const today = new Date();
+      const todayYear = today.getFullYear();
+      const todayMonth = String(today.getMonth() + 1).padStart(2, '0');
+      const todayDay = String(today.getDate()).padStart(2, '0');
+      const todayStr = `${todayYear}-${todayMonth}-${todayDay}`;
+      const currentTime = `${String(today.getHours()).padStart(2, '0')}:${String(today.getMinutes()).padStart(2, '0')}:00`;
+
+      const { data: partnerActiveRes } = await supabase
+        .from("reservations")
+        .select("*")
+        .or(`player1_id.eq.${partnerId},player2_id.eq.${partnerId}`)
+        .or(`date.gt.${todayStr},and(date.eq.${todayStr},start_time.gt.${currentTime})`);
+
+      if (partnerActiveRes && partnerActiveRes.length > 0) {
+        toast.error("Le partenaire sélectionné a déjà une réservation active");
         setLoading(false);
         return;
       }
