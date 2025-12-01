@@ -285,7 +285,19 @@ export const BookingModal = ({
       // Force page refresh to show new reservation
       window.location.reload();
     } catch (error: any) {
-      toast.error(error.message);
+      console.error("Erreur lors de la création de la réservation", error);
+      const message = error?.message ?? "";
+
+      if (
+        message.includes("row-level security") ||
+        message.includes("new row violates row-level security policy")
+      ) {
+        toast.error(
+          "Votre réservation ne peut pas être acceptée car vous avez déjà une réservation active."
+        );
+      } else {
+        toast.error("Une erreur est survenue lors de la création de la réservation.");
+      }
     } finally {
       setLoading(false);
     }
