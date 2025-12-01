@@ -22,7 +22,6 @@ import { z } from "zod";
 const newMemberSchema = z.object({
   fullName: z.string().min(2, "Le nom complet doit contenir au moins 2 caractères"),
   email: z.string().email("Email invalide"),
-  password: z.string().min(6, "Le mot de passe doit contenir au moins 6 caractères"),
 });
 
 const Admin = () => {
@@ -153,7 +152,6 @@ const Admin = () => {
     const data = {
       fullName: formData.get("fullName") as string,
       email: formData.get("email") as string,
-      password: formData.get("password") as string,
       role: formData.get("role") as string,
     };
 
@@ -181,7 +179,11 @@ const Admin = () => {
         throw new Error(result.error || "Erreur lors de la création");
       }
 
-      toast.success("Membre ajouté avec succès");
+      const credentials = result.credentials;
+      toast.success(
+        `Membre créé avec succès!\nLogin: ${credentials.login}\nPIN: ${credentials.pin}\nEmail: ${credentials.email}`,
+        { duration: 10000 }
+      );
       setAddMemberOpen(false);
       fetchData();
       (e.target as HTMLFormElement).reset();
@@ -434,12 +436,8 @@ const Admin = () => {
                             <Input id="fullName" name="fullName" required />
                           </div>
                           <div>
-                            <Label htmlFor="email">Email</Label>
-                            <Input id="email" name="email" type="email" required />
-                          </div>
-                          <div>
-                            <Label htmlFor="password">Mot de passe</Label>
-                            <Input id="password" name="password" type="password" required />
+                            <Label htmlFor="email">Email (optionnel)</Label>
+                            <Input id="email" name="email" type="email" placeholder="Laisser vide pour auto-générer" />
                           </div>
                           <div>
                             <Label htmlFor="role">Rôle</Label>

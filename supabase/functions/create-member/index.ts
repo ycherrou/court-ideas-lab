@@ -47,7 +47,36 @@ Deno.serve(async (req) => {
       })
     }
 
-    const { email, password, fullName, role } = await req.json()
+    const { email, fullName, role } = await req.json()
+
+    // Helper functions
+    const normalizeString = (str: string): string => {
+      return str
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase()
+        .replace(/[^a-z0-9]/g, '')
+    }
+
+    const generateLogin = (fullName: string): string => {
+      const normalized = normalizeString(fullName)
+      const parts = normalized.split(/\s+/).filter(p => p.length > 0)
+      
+      if (parts.length === 0) return 'user' + Math.floor(Math.random() * 10000)
+      if (parts.length === 1) return parts[0]
+      
+      const firstName = parts[0]
+      const lastName = parts[parts.length - 1]
+      return firstName.charAt(0) + lastName
+    }
+
+    const generatePIN = (): string => {
+      return Math.floor(1000 + Math.random() * 9000).toString()
+    }
+
+    const generateEmail = (login: string): string => {
+      return `${login}@tennis-club.local`
+    }
 
     // Valider le rôle
     const validRoles = ['player', 'admin', 'coach', 'super_coach']
@@ -58,10 +87,16 @@ Deno.serve(async (req) => {
       })
     }
 
+    // Generate login and PIN
+    const login = generateLogin(fullName)
+    const pin = generatePIN()
+    const generatedEmail = email || generateEmail(login)
+    const temporaryPassword = `temp_${pin}_${Date.now()}`
+
     // Create user with admin client
     const { data, error } = await supabaseAdmin.auth.admin.createUser({
-      email,
-      password,
+      email: generatedEmail,
+      password: temporaryPassword,
       email_confirm: true,
       user_metadata: {
         full_name: fullName,
@@ -75,21 +110,44 @@ Deno.serve(async (req) => {
       })
     }
 
-    // Assigner le rôle si spécifié
-    if (role && data.user) {
-      const { error: roleError } = await supabaseAdmin
-        .from('user_roles')
-        .insert({
-          user_id: data.user.id,
-          role: role
+    // Update profile with username, PIN, and must_change_password flag
+    if (data.user) {
+      const { error: profileError } = await supabaseAdmin
+        .from('profiles')
+        .update({
+          username: login,
+          temporary_pin: pin,
+          must_change_password: true
         })
+        .eq('id', data.user.id)
 
-      if (roleError) {
-        console.error('Error assigning role:', roleError)
+      if (profileError) {
+        console.error('Error updating profile:', profileError)
+      }
+
+      // Assigner le rôle si spécifié
+      if (role) {
+        const { error: roleError } = await supabaseAdmin
+          .from('user_roles')
+          .insert({
+            user_id: data.user.id,
+            role: role
+          })
+
+        if (roleError) {
+          console.error('Error assigning role:', roleError)
+        }
       }
     }
 
-    return new Response(JSON.stringify({ data }), {
+    return new Response(JSON.stringify({ 
+      data, 
+      credentials: { 
+        login, 
+        pin,
+        email: generatedEmail
+      } 
+    }), {
       status: 200,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     })
