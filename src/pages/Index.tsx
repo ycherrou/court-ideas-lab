@@ -14,7 +14,6 @@ import { addDays, format, startOfWeek } from "date-fns";
 import { fr } from "date-fns/locale";
 import { supabase } from "@/integrations/supabase/client";
 import { useIsMobile } from "@/hooks/use-mobile";
-import rtcmaLogo from "@/assets/rtcma-logo.png";
 
 const Index = () => {
   const navigate = useNavigate();
@@ -109,8 +108,8 @@ const Index = () => {
       {/* Desktop Header */}
       <header className="border-b hidden md:block">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <img src={rtcmaLogo} alt="RTCMA Logo" className="h-10 w-auto" />
+          <div className="flex items-center gap-2">
+            <Calendar className="h-6 w-6 text-primary" />
             <h1 className="text-2xl font-bold">RTCMA</h1>
           </div>
           <div className="flex items-center gap-4">
@@ -143,7 +142,7 @@ const Index = () => {
       <header className="border-b md:hidden sticky top-0 bg-background z-30">
         <div className="px-4 py-3 flex items-center justify-center">
           <div className="flex items-center gap-2">
-            <img src={rtcmaLogo} alt="RTCMA Logo" className="h-8 w-auto" />
+            <Calendar className="h-5 w-5 text-primary" />
             <h1 className="text-lg font-bold">RTCMA</h1>
           </div>
         </div>
