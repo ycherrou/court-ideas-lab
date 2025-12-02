@@ -8,6 +8,7 @@ import Auth from "./pages/Auth";
 import Admin from "./pages/Admin";
 import MyReservations from "./pages/MyReservations";
 import ChangePassword from "./pages/ChangePassword";
+import PublicDisplay from "./pages/PublicDisplay";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -24,6 +25,7 @@ const App = () => (
           <Route path="/admin" element={<Admin />} />
           <Route path="/mes-reservations" element={<MyReservations />} />
           <Route path="/change-password" element={<ChangePassword />} />
+          <Route path="/affichage" element={<PublicDisplay />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
