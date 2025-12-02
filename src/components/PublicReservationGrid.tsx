@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 
 interface Court {
   id: string;
@@ -29,25 +28,8 @@ interface BlockedSlot {
   reason: string;
 }
 
-const getFilteredHours = (date: Date) => {
-  const now = new Date();
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  const dateString = `${year}-${month}-${day}`;
-  
-  const todayYear = now.getFullYear();
-  const todayMonth = String(now.getMonth() + 1).padStart(2, '0');
-  const todayDay = String(now.getDate()).padStart(2, '0');
-  const todayString = `${todayYear}-${todayMonth}-${todayDay}`;
-  
-  // Si c'est aujourd'hui, filtrer les heures passées
-  if (dateString === todayString) {
-    const currentHour = now.getHours();
-    return Array.from({ length: 14 }, (_, i) => i + 7).filter(hour => hour >= currentHour);
-  }
-  
-  // Sinon, afficher toutes les heures
+// Afficher toutes les heures de 7h à 20h
+const getAllHours = () => {
   return Array.from({ length: 14 }, (_, i) => i + 7);
 };
 
@@ -127,10 +109,10 @@ export const PublicReservationGrid = ({ date }: { date: Date }) => {
 
     if (blocked) {
       return (
-        <div className="h-full bg-destructive/30 border-2 border-destructive/60 flex items-center justify-center p-3 text-center">
+        <div className="h-full bg-destructive/30 border-2 border-destructive/60 flex items-center justify-center p-1 text-center">
           <div>
-            <div className="font-bold text-lg">BLOQUÉ</div>
-            <div className="text-sm text-muted-foreground mt-1">{blocked.reason}</div>
+            <div className="font-bold text-xs">BLOQUÉ</div>
+            <div className="text-[10px] text-muted-foreground mt-0.5 truncate">{blocked.reason}</div>
           </div>
         </div>
       );
@@ -142,13 +124,13 @@ export const PublicReservationGrid = ({ date }: { date: Date }) => {
 
     if (reservation) {
       return (
-        <div className="h-full bg-accent border-2 border-accent-foreground/20 flex items-center justify-center p-3 text-center">
+        <div className="h-full bg-accent border-2 border-accent-foreground/20 flex items-center justify-center p-1 text-center">
           <div className="leading-tight">
-            <div className="font-semibold text-base truncate">
+            <div className="font-semibold text-xs truncate">
               {reservation.player1?.full_name || ''}
             </div>
-            <div className="text-muted-foreground text-sm my-1">&</div>
-            <div className="font-semibold text-base truncate">
+            <div className="text-muted-foreground text-[10px] my-0.5">&</div>
+            <div className="font-semibold text-xs truncate">
               {reservation.player2?.full_name || ''}
             </div>
           </div>
@@ -158,7 +140,7 @@ export const PublicReservationGrid = ({ date }: { date: Date }) => {
 
     // Available slot
     return (
-      <div className="h-full bg-success/20 border-2 border-success/50 flex items-center justify-center text-lg font-medium text-success">
+      <div className="h-full bg-success/20 border-2 border-success/50 flex items-center justify-center text-xs font-medium text-success">
         Disponible
       </div>
     );
@@ -168,38 +150,38 @@ export const PublicReservationGrid = ({ date }: { date: Date }) => {
     return <Skeleton className="w-full h-96" />;
   }
 
-  const filteredHours = getFilteredHours(date);
+  const allHours = getAllHours();
 
   return (
-    <ScrollArea className="w-full h-[calc(100vh-200px)]">
-      <div className="min-w-max pb-6">
-        <div className="grid grid-cols-[120px_repeat(10,minmax(150px,1fr))] gap-2">
-          {/* Empty corner cell - sticky */}
-          <div className="font-bold text-xl p-4 bg-muted sticky top-0 left-0 z-20 border-r-2 border-b-2"></div>
+    <div className="w-full h-[calc(100vh-200px)] overflow-hidden">
+      <div className="h-full">
+        <div className="grid grid-cols-[60px_repeat(10,1fr)] gap-0.5 h-full">
+          {/* Empty corner cell */}
+          <div className="font-bold text-sm p-1 bg-muted border-r border-b"></div>
           
-          {/* Court headers - sticky top */}
+          {/* Court headers */}
           {courts.map((court) => (
             <div 
               key={court.id} 
-              className="font-bold text-xl p-4 bg-muted text-center sticky top-0 z-10 border-b-2"
+              className="font-bold text-sm p-1 bg-muted text-center border-b"
             >
               {court.name}
             </div>
           ))}
 
-          {filteredHours.map((hour) => (
+          {allHours.map((hour) => (
             <>
-              {/* Hour labels - sticky left */}
+              {/* Hour labels */}
               <div 
                 key={`hour-${hour}`} 
-                className="font-bold text-xl p-4 bg-muted flex items-center justify-center sticky left-0 z-10 border-r-2"
+                className="font-bold text-sm p-1 bg-muted flex items-center justify-center border-r"
               >
                 {hour}h
               </div>
               
               {/* Court slots */}
               {courts.map((court) => (
-                <Card key={`${court.id}-${hour}`} className="min-h-[100px] overflow-hidden border-2">
+                <Card key={`${court.id}-${hour}`} className="overflow-hidden border">
                   {getSlotContent(court.id, hour)}
                 </Card>
               ))}
@@ -207,8 +189,6 @@ export const PublicReservationGrid = ({ date }: { date: Date }) => {
           ))}
         </div>
       </div>
-      <ScrollBar orientation="horizontal" />
-      <ScrollBar orientation="vertical" />
-    </ScrollArea>
+    </div>
   );
 };

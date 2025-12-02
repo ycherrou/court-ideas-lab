@@ -106,7 +106,7 @@ const PublicDisplay = () => {
       </header>
 
       {/* Main content */}
-      <main className="container mx-auto px-6 py-6">
+      <main className="container mx-auto px-4 py-2">
         <PublicReservationGrid date={currentDate} />
       </main>
 
