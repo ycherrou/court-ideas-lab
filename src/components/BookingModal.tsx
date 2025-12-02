@@ -116,10 +116,10 @@ export const BookingModal = ({
     }
 
     return allSlots.filter((slot) => {
-      // Check if blocked
+      // Check if blocked (for this specific court OR global blocks with court_id = null)
       const isBlocked = blockedSlotsData.some(
         (b) =>
-          b.court_id === selectedCourt &&
+          (b.court_id === selectedCourt || b.court_id === null) &&
           slot >= b.start_time &&
           slot < b.end_time
       );
@@ -230,16 +230,20 @@ export const BookingModal = ({
       const hour = parseInt(hourStr);
       const endTime = `${(hour + 1).toString().padStart(2, "0")}:00:00`;
 
-      // Verify slot is not blocked
+      // Verify slot is not blocked (check both specific court and global blocks where court_id is null)
       const { data: blockedSlots } = await supabase
         .from("blocked_slots")
         .select("*")
         .eq("date", dateStr)
-        .eq("court_id", selectedCourt)
         .lte("start_time", selectedTime)
-        .gte("end_time", selectedTime);
+        .gt("end_time", selectedTime);
+      
+      // Filter to only include blocks for this court or global blocks (court_id is null)
+      const relevantBlocks = blockedSlots?.filter(
+        (b) => b.court_id === selectedCourt || b.court_id === null
+      );
 
-      if (blockedSlots && blockedSlots.length > 0) {
+      if (relevantBlocks && relevantBlocks.length > 0) {
         toast.error("Ce créneau est bloqué");
         setLoading(false);
         return;
