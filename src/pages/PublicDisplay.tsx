@@ -2,12 +2,40 @@ import { useEffect, useState } from "react";
 import { PublicReservationGrid } from "@/components/PublicReservationGrid";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
+import { Maximize, Minimize } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import rtcmaLogo from "@/assets/rtcma-logo.png";
 
 const PublicDisplay = () => {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [currentTime, setCurrentTime] = useState(new Date());
   const [lastRefresh, setLastRefresh] = useState(new Date());
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
+  // Gérer le mode plein écran
+  const toggleFullscreen = async () => {
+    try {
+      if (!document.fullscreenElement) {
+        await document.documentElement.requestFullscreen();
+        setIsFullscreen(true);
+      } else {
+        await document.exitFullscreen();
+        setIsFullscreen(false);
+      }
+    } catch (error) {
+      console.error("Erreur lors du changement de mode plein écran:", error);
+    }
+  };
+
+  // Écouter les changements de plein écran
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(!!document.fullscreenElement);
+    };
+
+    document.addEventListener("fullscreenchange", handleFullscreenChange);
+    return () => document.removeEventListener("fullscreenchange", handleFullscreenChange);
+  }, []);
 
   // Horloge en temps réel - mise à jour chaque seconde
   useEffect(() => {
@@ -49,11 +77,29 @@ const PublicDisplay = () => {
               </p>
             </div>
             
-            {/* Clock */}
-            <div className="text-right">
+            {/* Clock and Fullscreen Button */}
+            <div className="text-right flex flex-col items-end gap-3">
               <div className="text-4xl font-bold font-mono">
                 {format(currentTime, 'HH:mm:ss')}
               </div>
+              <Button
+                onClick={toggleFullscreen}
+                variant="outline"
+                size="lg"
+                className="gap-2"
+              >
+                {isFullscreen ? (
+                  <>
+                    <Minimize className="h-5 w-5" />
+                    Quitter plein écran
+                  </>
+                ) : (
+                  <>
+                    <Maximize className="h-5 w-5" />
+                    Plein écran
+                  </>
+                )}
+              </Button>
             </div>
           </div>
         </div>
