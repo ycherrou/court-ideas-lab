@@ -34,7 +34,7 @@ export const useCoachRestrictions = (userId: string | undefined) => {
         const { data: courts } = await supabase
           .from("courts")
           .select("id")
-          .or("court_number.in.(6,7,8,9),is_central.eq.true");
+          .or("court_number.in.(5,6,7,8,9),is_central.eq.true");
 
         setAllowedCourtIds(courts?.map((c) => c.id) || []);
       } else {
