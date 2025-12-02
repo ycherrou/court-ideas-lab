@@ -121,10 +121,10 @@ export const PublicReservationGrid = ({ date }: { date: Date }) => {
 
     if (blocked) {
       return (
-        <div className="h-full bg-destructive/30 border-2 border-destructive/60 flex items-center justify-center p-1 text-center">
-          <div>
-            <div className="font-bold text-xs">BLOQUÉ</div>
-            <div className="text-[10px] text-muted-foreground mt-0.5 truncate">{blocked.reason}</div>
+        <div className="h-full bg-destructive/30 border-2 border-destructive/60 flex items-center justify-center p-2 text-center">
+          <div className="w-full">
+            <div className="font-bold text-[11px] leading-tight">BLOQUÉ</div>
+            <div className="text-[9px] text-muted-foreground mt-1 truncate">{blocked.reason}</div>
           </div>
         </div>
       );
@@ -136,13 +136,13 @@ export const PublicReservationGrid = ({ date }: { date: Date }) => {
 
     if (reservation) {
       return (
-        <div className="h-full bg-accent border-2 border-accent-foreground/20 flex items-center justify-center p-1 text-center">
-          <div className="leading-tight">
-            <div className="font-semibold text-xs truncate">
+        <div className="h-full bg-accent border-2 border-accent-foreground/20 flex items-center justify-center p-2 text-center">
+          <div className="leading-tight w-full">
+            <div className="font-semibold text-[11px] truncate px-1">
               {reservation.player1?.full_name || ''}
             </div>
-            <div className="text-muted-foreground text-[10px] my-0.5">&</div>
-            <div className="font-semibold text-xs truncate">
+            <div className="text-muted-foreground text-[9px] my-0.5">&</div>
+            <div className="font-semibold text-[11px] truncate px-1">
               {reservation.player2?.full_name || ''}
             </div>
           </div>
@@ -150,11 +150,9 @@ export const PublicReservationGrid = ({ date }: { date: Date }) => {
       );
     }
 
-    // Available slot
+    // Available slot - empty
     return (
-      <div className="h-full bg-success/20 border-2 border-success/50 flex items-center justify-center text-xl font-bold text-success">
-        -
-      </div>
+      <div className="h-full bg-success/20 border-2 border-success/50"></div>
     );
   };
 
