@@ -152,8 +152,8 @@ export const PublicReservationGrid = ({ date }: { date: Date }) => {
 
     // Available slot
     return (
-      <div className="h-full bg-success/20 border-2 border-success/50 flex items-center justify-center text-xs font-medium text-success">
-        Disponible
+      <div className="h-full bg-success/20 border-2 border-success/50 flex items-center justify-center text-xl font-bold text-success">
+        -
       </div>
     );
   };
