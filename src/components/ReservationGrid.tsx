@@ -156,9 +156,6 @@ export const ReservationGrid = ({
       const isMyReservation =
         userId &&
         (reservation.player1_id === userId || reservation.player2_id === userId);
-      
-      const player1FirstName = reservation.player1?.full_name?.split(' ')[0] || '';
-      const player2FirstName = reservation.player2?.full_name?.split(' ')[0] || '';
 
       return (
         <div
@@ -168,11 +165,11 @@ export const ReservationGrid = ({
         >
           <div className="leading-tight">
             <div className="font-medium truncate">
-              {player1FirstName}
+              {reservation.player1?.full_name || ''}
             </div>
             <div className="text-muted-foreground text-[6px] md:text-xs">&</div>
             <div className="font-medium truncate">
-              {player2FirstName}
+              {reservation.player2?.full_name || ''}
             </div>
           </div>
         </div>
