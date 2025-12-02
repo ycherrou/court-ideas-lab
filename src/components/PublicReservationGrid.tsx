@@ -38,11 +38,23 @@ export const PublicReservationGrid = ({ date }: { date: Date }) => {
   const [reservations, setReservations] = useState<Reservation[]>([]);
   const [blockedSlots, setBlockedSlots] = useState<BlockedSlot[]>([]);
   const [loading, setLoading] = useState(true);
+  const [currentHour, setCurrentHour] = useState(new Date().getHours());
 
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, '0');
   const day = String(date.getDate()).padStart(2, '0');
   const dateString = `${year}-${month}-${day}`;
+
+  // Mettre à jour l'heure actuelle chaque minute
+  useEffect(() => {
+    const updateCurrentHour = () => {
+      setCurrentHour(new Date().getHours());
+    };
+    
+    const intervalId = setInterval(updateCurrentHour, 60000); // Toutes les 60 secondes
+    
+    return () => clearInterval(intervalId);
+  }, []);
 
   useEffect(() => {
     fetchData();
@@ -151,6 +163,13 @@ export const PublicReservationGrid = ({ date }: { date: Date }) => {
   }
 
   const allHours = getAllHours();
+  
+  // Vérifier si on affiche aujourd'hui
+  const today = new Date();
+  const isToday = 
+    date.getFullYear() === today.getFullYear() &&
+    date.getMonth() === today.getMonth() &&
+    date.getDate() === today.getDate();
 
   return (
     <div className="w-full h-[calc(100vh-200px)] overflow-hidden">
@@ -169,24 +188,42 @@ export const PublicReservationGrid = ({ date }: { date: Date }) => {
             </div>
           ))}
 
-          {allHours.map((hour) => (
-            <>
-              {/* Hour labels */}
-              <div 
-                key={`hour-${hour}`} 
-                className="font-bold text-sm p-1 bg-muted flex items-center justify-center border-r"
-              >
-                {hour}h
-              </div>
-              
-              {/* Court slots */}
-              {courts.map((court) => (
-                <Card key={`${court.id}-${hour}`} className="overflow-hidden border">
-                  {getSlotContent(court.id, hour)}
-                </Card>
-              ))}
-            </>
-          ))}
+          {allHours.map((hour) => {
+            const isCurrentHour = isToday && hour === currentHour;
+            
+            return (
+              <>
+                {/* Hour labels */}
+                <div 
+                  key={`hour-${hour}`} 
+                  className={`font-bold text-sm p-1 flex items-center justify-center border-r ${
+                    isCurrentHour 
+                      ? 'bg-primary text-primary-foreground animate-pulse' 
+                      : 'bg-muted'
+                  }`}
+                >
+                  {hour}h
+                  {isCurrentHour && (
+                    <span className="ml-1 text-[10px]">●</span>
+                  )}
+                </div>
+                
+                {/* Court slots */}
+                {courts.map((court) => (
+                  <Card 
+                    key={`${court.id}-${hour}`} 
+                    className={`overflow-hidden ${
+                      isCurrentHour 
+                        ? 'border-4 border-primary shadow-lg' 
+                        : 'border'
+                    }`}
+                  >
+                    {getSlotContent(court.id, hour)}
+                  </Card>
+                ))}
+              </>
+            );
+          })}
         </div>
       </div>
     </div>
