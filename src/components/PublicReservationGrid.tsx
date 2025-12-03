@@ -44,14 +44,11 @@ export const PublicReservationGrid = ({ date }: { date: Date }) => {
   const day = String(date.getDate()).padStart(2, '0');
   const dateString = `${year}-${month}-${day}`;
 
-  // Mettre à jour l'heure actuelle chaque minute
   useEffect(() => {
     const updateCurrentHour = () => {
       setCurrentHour(new Date().getHours());
     };
-    
     const intervalId = setInterval(updateCurrentHour, 60000);
-    
     return () => clearInterval(intervalId);
   }, []);
 
@@ -82,18 +79,11 @@ export const PublicReservationGrid = ({ date }: { date: Date }) => {
         supabase.from("courts").select("*").order("court_number"),
         supabase
           .from("reservations")
-          .select(
-            `
-            id,
-            court_id,
-            start_time,
-            end_time,
-            player1_id,
-            player2_id,
+          .select(`
+            id, court_id, start_time, end_time, player1_id, player2_id,
             player1:player1_id(full_name),
             player2:player2_id(full_name)
-          `
-          )
+          `)
           .eq("date", dateString),
         supabase.from("blocked_slots").select("*").eq("date", dateString),
       ]);
@@ -120,8 +110,8 @@ export const PublicReservationGrid = ({ date }: { date: Date }) => {
 
     if (blocked) {
       return (
-        <div className="h-full w-full bg-destructive/20 flex flex-col items-center justify-center">
-          <span className="font-bold text-destructive text-[10px]">BLOQUÉ</span>
+        <div className="h-full w-full bg-destructive/30 flex items-center justify-center">
+          <span className="font-bold text-destructive text-xs">BLOQUÉ</span>
         </div>
       );
     }
@@ -132,21 +122,18 @@ export const PublicReservationGrid = ({ date }: { date: Date }) => {
 
     if (reservation) {
       return (
-        <div className="h-full w-full bg-primary/20 flex flex-col items-center justify-center px-1">
-          <span className="font-semibold text-primary text-[9px] truncate max-w-full leading-tight">
+        <div className="h-full w-full bg-primary/25 flex flex-col items-center justify-center px-1">
+          <span className="font-semibold text-primary text-[11px] truncate max-w-full leading-tight">
             {reservation.player1?.full_name || ''}
           </span>
-          <span className="font-semibold text-primary text-[9px] truncate max-w-full leading-tight">
+          <span className="font-semibold text-primary text-[11px] truncate max-w-full leading-tight">
             {reservation.player2?.full_name || ''}
           </span>
         </div>
       );
     }
 
-    // Available slot - empty with subtle pattern
-    return (
-      <div className="h-full w-full bg-emerald-500/10"></div>
-    );
+    return <div className="h-full w-full bg-emerald-500/15"></div>;
   };
 
   if (loading) {
@@ -154,8 +141,6 @@ export const PublicReservationGrid = ({ date }: { date: Date }) => {
   }
 
   const allHours = getAllHours();
-  
-  // Vérifier si on affiche aujourd'hui
   const today = new Date();
   const isToday = 
     date.getFullYear() === today.getFullYear() &&
@@ -164,77 +149,83 @@ export const PublicReservationGrid = ({ date }: { date: Date }) => {
 
   return (
     <div className="w-full h-full flex flex-col">
-      <table className="w-full h-full border-collapse table-fixed">
-        <thead>
-          <tr>
-            {/* Corner cell - Court header */}
-            <th className="bg-primary text-primary-foreground font-bold text-xs p-1 border border-border w-[100px]">
-              Terrain
-            </th>
-            {/* Hour headers */}
+      {/* Grid container */}
+      <div 
+        className="flex-1 grid"
+        style={{
+          gridTemplateColumns: `100px repeat(${allHours.length}, 1fr)`,
+          gridTemplateRows: `40px repeat(${courts.length}, 1fr)`,
+        }}
+      >
+        {/* Header: Corner */}
+        <div className="bg-primary text-primary-foreground font-bold text-sm flex items-center justify-center border border-border">
+          Terrain
+        </div>
+        
+        {/* Header: Hours */}
+        {allHours.map((hour) => {
+          const isCurrentHour = isToday && hour === currentHour;
+          return (
+            <div
+              key={hour}
+              className={`font-bold text-sm flex items-center justify-center border border-border ${
+                isCurrentHour
+                  ? 'bg-primary text-primary-foreground'
+                  : 'bg-muted text-muted-foreground'
+              }`}
+            >
+              {hour}h
+              {isCurrentHour && <span className="ml-1 animate-pulse">●</span>}
+            </div>
+          );
+        })}
+
+        {/* Rows: Courts and slots */}
+        {courts.map((court) => (
+          <>
+            {/* Court name */}
+            <div
+              key={`court-${court.id}`}
+              className="bg-secondary text-secondary-foreground font-bold text-sm flex items-center gap-2 px-2 border border-border"
+            >
+              <span className="w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-bold shrink-0">
+                {court.court_number}
+              </span>
+              <span className="truncate text-xs">
+                {court.court_number === 10 ? 'Central' : `Terrain ${court.court_number}`}
+              </span>
+            </div>
+            
+            {/* Time slots */}
             {allHours.map((hour) => {
               const isCurrentHour = isToday && hour === currentHour;
               return (
-                <th
-                  key={hour}
-                  className={`font-bold text-xs p-1 border border-border transition-all ${
-                    isCurrentHour
-                      ? 'bg-primary text-primary-foreground'
-                      : 'bg-muted text-muted-foreground'
+                <div
+                  key={`${court.id}-${hour}`}
+                  className={`border border-border ${
+                    isCurrentHour ? 'ring-2 ring-inset ring-primary' : ''
                   }`}
                 >
-                  <span>{hour}h</span>
-                  {isCurrentHour && (
-                    <span className="ml-1 text-[8px] animate-pulse">●</span>
-                  )}
-                </th>
+                  {getSlotContent(court.id, hour)}
+                </div>
               );
             })}
-          </tr>
-        </thead>
-        <tbody>
-          {courts.map((court, index) => (
-            <tr key={court.id} className={index % 2 === 0 ? 'bg-background' : 'bg-muted/30'}>
-              {/* Court name - sticky left */}
-              <td className="bg-secondary text-secondary-foreground font-bold text-xs p-1 border border-border">
-                <div className="flex items-center gap-1">
-                  <span className="w-5 h-5 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-[10px] font-bold shrink-0">
-                    {court.court_number}
-                  </span>
-                  <span className="truncate text-[10px]">{court.name}</span>
-                </div>
-              </td>
-              {/* Time slots */}
-              {allHours.map((hour) => {
-                const isCurrentHour = isToday && hour === currentHour;
-                return (
-                  <td
-                    key={`${court.id}-${hour}`}
-                    className={`border border-border p-0 transition-all ${
-                      isCurrentHour ? 'ring-2 ring-inset ring-primary bg-primary/5' : ''
-                    }`}
-                  >
-                    {getSlotContent(court.id, hour)}
-                  </td>
-                );
-              })}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-      
+          </>
+        ))}
+      </div>
+
       {/* Legend */}
-      <div className="flex items-center justify-center gap-4 py-2 text-xs shrink-0">
-        <div className="flex items-center gap-1">
-          <div className="w-4 h-4 bg-emerald-500/10 border border-border rounded"></div>
+      <div className="flex items-center justify-center gap-6 py-2 text-xs shrink-0 bg-background">
+        <div className="flex items-center gap-2">
+          <div className="w-4 h-4 bg-emerald-500/15 border border-border rounded"></div>
           <span className="text-muted-foreground">Disponible</span>
         </div>
-        <div className="flex items-center gap-1">
-          <div className="w-4 h-4 bg-primary/20 border border-border rounded"></div>
+        <div className="flex items-center gap-2">
+          <div className="w-4 h-4 bg-primary/25 border border-border rounded"></div>
           <span className="text-muted-foreground">Réservé</span>
         </div>
-        <div className="flex items-center gap-1">
-          <div className="w-4 h-4 bg-destructive/20 border border-border rounded"></div>
+        <div className="flex items-center gap-2">
+          <div className="w-4 h-4 bg-destructive/30 border border-border rounded"></div>
           <span className="text-muted-foreground">Bloqué</span>
         </div>
       </div>
