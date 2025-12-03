@@ -106,12 +106,12 @@ const PublicDisplay = () => {
       </header>
 
       {/* Main content */}
-      <main className="flex-1 container mx-auto px-4 py-4 overflow-auto pb-16">
+      <main className="flex-1 px-2 py-2 overflow-hidden">
         <PublicReservationGrid date={currentDate} />
       </main>
 
       {/* Footer with refresh info */}
-      <footer className="fixed bottom-0 left-0 right-0 bg-muted/95 backdrop-blur border-t py-2 z-50">
+      <footer className="bg-muted/95 backdrop-blur border-t py-1 shrink-0">
         <div className="container mx-auto px-6">
           <div className="flex items-center justify-between text-xs">
             <div className="flex items-center gap-2">

@@ -120,9 +120,8 @@ export const PublicReservationGrid = ({ date }: { date: Date }) => {
 
     if (blocked) {
       return (
-        <div className="h-full w-full bg-destructive/20 flex flex-col items-center justify-center p-1">
-          <span className="font-bold text-destructive text-xs">BLOQUÉ</span>
-          <span className="text-[8px] text-destructive/70 truncate max-w-full">{blocked.reason}</span>
+        <div className="h-full w-full bg-destructive/20 flex flex-col items-center justify-center">
+          <span className="font-bold text-destructive text-[10px]">BLOQUÉ</span>
         </div>
       );
     }
@@ -133,12 +132,11 @@ export const PublicReservationGrid = ({ date }: { date: Date }) => {
 
     if (reservation) {
       return (
-        <div className="h-full w-full bg-primary/20 flex flex-col items-center justify-center p-1">
-          <span className="font-semibold text-primary text-[10px] truncate max-w-full leading-tight">
+        <div className="h-full w-full bg-primary/20 flex flex-col items-center justify-center px-1">
+          <span className="font-semibold text-primary text-[9px] truncate max-w-full leading-tight">
             {reservation.player1?.full_name || ''}
           </span>
-          <span className="text-primary/60 text-[8px]">&</span>
-          <span className="font-semibold text-primary text-[10px] truncate max-w-full leading-tight">
+          <span className="font-semibold text-primary text-[9px] truncate max-w-full leading-tight">
             {reservation.player2?.full_name || ''}
           </span>
         </div>
@@ -152,7 +150,7 @@ export const PublicReservationGrid = ({ date }: { date: Date }) => {
   };
 
   if (loading) {
-    return <Skeleton className="w-full h-[500px]" />;
+    return <Skeleton className="w-full h-full" />;
   }
 
   const allHours = getAllHours();
@@ -165,12 +163,12 @@ export const PublicReservationGrid = ({ date }: { date: Date }) => {
     date.getDate() === today.getDate();
 
   return (
-    <div className="w-full overflow-x-auto">
-      <table className="w-full border-collapse min-w-[900px]">
+    <div className="w-full h-full flex flex-col">
+      <table className="w-full h-full border-collapse table-fixed">
         <thead>
           <tr>
             {/* Corner cell - Court header */}
-            <th className="sticky left-0 z-20 bg-primary text-primary-foreground font-bold text-sm p-3 border border-border min-w-[120px]">
+            <th className="bg-primary text-primary-foreground font-bold text-xs p-1 border border-border w-[100px]">
               Terrain
             </th>
             {/* Hour headers */}
@@ -179,18 +177,16 @@ export const PublicReservationGrid = ({ date }: { date: Date }) => {
               return (
                 <th
                   key={hour}
-                  className={`font-bold text-sm p-2 border border-border min-w-[70px] transition-all ${
+                  className={`font-bold text-xs p-1 border border-border transition-all ${
                     isCurrentHour
-                      ? 'bg-primary text-primary-foreground ring-2 ring-primary ring-offset-2'
+                      ? 'bg-primary text-primary-foreground'
                       : 'bg-muted text-muted-foreground'
                   }`}
                 >
-                  <div className="flex flex-col items-center">
-                    <span className="text-lg">{hour}h</span>
-                    {isCurrentHour && (
-                      <span className="text-[10px] animate-pulse">● maintenant</span>
-                    )}
-                  </div>
+                  <span>{hour}h</span>
+                  {isCurrentHour && (
+                    <span className="ml-1 text-[8px] animate-pulse">●</span>
+                  )}
                 </th>
               );
             })}
@@ -200,12 +196,12 @@ export const PublicReservationGrid = ({ date }: { date: Date }) => {
           {courts.map((court, index) => (
             <tr key={court.id} className={index % 2 === 0 ? 'bg-background' : 'bg-muted/30'}>
               {/* Court name - sticky left */}
-              <td className="sticky left-0 z-10 bg-secondary text-secondary-foreground font-bold text-sm p-3 border border-border">
-                <div className="flex items-center gap-2">
-                  <span className="w-8 h-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm font-bold">
+              <td className="bg-secondary text-secondary-foreground font-bold text-xs p-1 border border-border">
+                <div className="flex items-center gap-1">
+                  <span className="w-5 h-5 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-[10px] font-bold shrink-0">
                     {court.court_number}
                   </span>
-                  <span className="truncate">{court.name}</span>
+                  <span className="truncate text-[10px]">{court.name}</span>
                 </div>
               </td>
               {/* Time slots */}
@@ -214,7 +210,7 @@ export const PublicReservationGrid = ({ date }: { date: Date }) => {
                 return (
                   <td
                     key={`${court.id}-${hour}`}
-                    className={`border border-border h-[80px] p-0 transition-all ${
+                    className={`border border-border p-0 transition-all ${
                       isCurrentHour ? 'ring-2 ring-inset ring-primary bg-primary/5' : ''
                     }`}
                   >
@@ -228,17 +224,17 @@ export const PublicReservationGrid = ({ date }: { date: Date }) => {
       </table>
       
       {/* Legend */}
-      <div className="flex items-center justify-center gap-6 mt-4 text-sm">
-        <div className="flex items-center gap-2">
-          <div className="w-5 h-5 bg-emerald-500/10 border border-border rounded"></div>
+      <div className="flex items-center justify-center gap-4 py-2 text-xs shrink-0">
+        <div className="flex items-center gap-1">
+          <div className="w-4 h-4 bg-emerald-500/10 border border-border rounded"></div>
           <span className="text-muted-foreground">Disponible</span>
         </div>
-        <div className="flex items-center gap-2">
-          <div className="w-5 h-5 bg-primary/20 border border-border rounded"></div>
+        <div className="flex items-center gap-1">
+          <div className="w-4 h-4 bg-primary/20 border border-border rounded"></div>
           <span className="text-muted-foreground">Réservé</span>
         </div>
-        <div className="flex items-center gap-2">
-          <div className="w-5 h-5 bg-destructive/20 border border-border rounded"></div>
+        <div className="flex items-center gap-1">
+          <div className="w-4 h-4 bg-destructive/20 border border-border rounded"></div>
           <span className="text-muted-foreground">Bloqué</span>
         </div>
       </div>
