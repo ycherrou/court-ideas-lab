@@ -57,45 +57,45 @@ const PublicDisplay = () => {
   }, []);
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background flex flex-col">
       {/* Header */}
-      <header className="border-b-4 border-primary bg-muted/50">
-        <div className="container mx-auto px-6 py-6">
+      <header className="border-b-4 border-primary bg-gradient-to-r from-primary/10 via-background to-primary/10 shrink-0">
+        <div className="container mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
             {/* Logo */}
             <div className="flex items-center gap-4">
-              <img src={rtcmaLogo} alt="RTCMA Logo" className="h-16 w-auto" />
+              <img src={rtcmaLogo} alt="RTCMA Logo" className="h-14 w-auto" />
             </div>
             
             {/* Title */}
             <div className="text-center flex-1">
-              <h1 className="text-4xl font-bold mb-2">
+              <h1 className="text-3xl font-bold text-foreground">
                 Réservations du jour
               </h1>
-              <p className="text-2xl text-muted-foreground">
+              <p className="text-xl text-primary font-medium">
                 {format(currentDate, 'EEEE d MMMM yyyy', { locale: fr })}
               </p>
             </div>
             
             {/* Clock and Fullscreen Button */}
-            <div className="text-right flex flex-col items-end gap-3">
-              <div className="text-4xl font-bold font-mono">
+            <div className="text-right flex flex-col items-end gap-2">
+              <div className="text-4xl font-bold font-mono text-foreground tabular-nums">
                 {format(currentTime, 'HH:mm:ss')}
               </div>
               <Button
                 onClick={toggleFullscreen}
                 variant="outline"
-                size="lg"
+                size="sm"
                 className="gap-2"
               >
                 {isFullscreen ? (
                   <>
-                    <Minimize className="h-5 w-5" />
-                    Quitter plein écran
+                    <Minimize className="h-4 w-4" />
+                    Quitter
                   </>
                 ) : (
                   <>
-                    <Maximize className="h-5 w-5" />
+                    <Maximize className="h-4 w-4" />
                     Plein écran
                   </>
                 )}
@@ -106,20 +106,20 @@ const PublicDisplay = () => {
       </header>
 
       {/* Main content */}
-      <main className="container mx-auto px-4 py-2">
+      <main className="flex-1 container mx-auto px-4 py-4 overflow-auto pb-16">
         <PublicReservationGrid date={currentDate} />
       </main>
 
       {/* Footer with refresh info */}
-      <footer className="fixed bottom-0 left-0 right-0 bg-muted/80 border-t-2 border-primary py-3">
+      <footer className="fixed bottom-0 left-0 right-0 bg-muted/95 backdrop-blur border-t py-2 z-50">
         <div className="container mx-auto px-6">
-          <div className="flex items-center justify-between text-sm">
+          <div className="flex items-center justify-between text-xs">
             <div className="flex items-center gap-2">
-              <div className="w-3 h-3 bg-success rounded-full animate-pulse"></div>
-              <span className="font-medium">Actualisation automatique chaque minute</span>
+              <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></div>
+              <span className="text-muted-foreground">Actualisation automatique</span>
             </div>
             <div className="text-muted-foreground">
-              Dernière mise à jour : {format(lastRefresh, 'HH:mm:ss')}
+              Mise à jour : {format(lastRefresh, 'HH:mm:ss')}
             </div>
           </div>
         </div>
