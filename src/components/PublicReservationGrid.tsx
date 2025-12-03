@@ -110,8 +110,10 @@ export const PublicReservationGrid = ({ date }: { date: Date }) => {
 
     if (blocked) {
       return (
-        <div className="h-full w-full bg-destructive/30 flex items-center justify-center">
-          <span className="font-bold text-destructive text-xs">BLOQUÉ</span>
+        <div className="h-full w-full bg-destructive/30 flex flex-col items-center justify-center px-1">
+          <span className="font-bold text-destructive text-[10px] uppercase leading-tight">
+            {blocked.reason || 'BLOQUÉ'}
+          </span>
         </div>
       );
     }
