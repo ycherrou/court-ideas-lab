@@ -59,7 +59,7 @@ const PublicDisplay = () => {
   return (
     <div className="min-h-screen bg-background flex flex-col">
       {/* Header */}
-      <header className="border-b-4 border-primary bg-primary shrink-0">
+      <header className="border-b-4 border-primary bg-background shrink-0">
         <div className="container mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
             {/* Logo */}
@@ -69,22 +69,22 @@ const PublicDisplay = () => {
             
             {/* Title */}
             <div className="text-center flex-1">
-              <h1 className="text-3xl font-bold text-primary-foreground">
+              <h1 className="text-3xl font-bold text-foreground">
                 Réservations du jour
               </h1>
-              <p className="text-xl text-primary-foreground/80 font-medium">
+              <p className="text-xl text-primary font-medium">
                 {format(currentDate, 'EEEE d MMMM yyyy', { locale: fr })}
               </p>
             </div>
             
             {/* Clock and Fullscreen Button */}
             <div className="text-right flex flex-col items-end gap-2">
-              <div className="text-4xl font-bold font-mono text-primary-foreground tabular-nums">
+              <div className="text-4xl font-bold font-mono text-foreground tabular-nums">
                 {format(currentTime, 'HH:mm:ss')}
               </div>
               <Button
                 onClick={toggleFullscreen}
-                variant="secondary"
+                variant="outline"
                 size="sm"
                 className="gap-2"
               >
