@@ -155,7 +155,7 @@ export const PublicReservationGrid = ({ date }: { date: Date }) => {
       <div 
         className="flex-1 grid"
         style={{
-          gridTemplateColumns: `100px repeat(${allHours.length}, 1fr)`,
+          gridTemplateColumns: `130px repeat(${allHours.length}, 1fr)`,
           gridTemplateRows: `40px repeat(${courts.length}, 1fr)`,
         }}
       >
