@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 
 interface Court {
@@ -51,7 +50,7 @@ export const PublicReservationGrid = ({ date }: { date: Date }) => {
       setCurrentHour(new Date().getHours());
     };
     
-    const intervalId = setInterval(updateCurrentHour, 60000); // Toutes les 60 secondes
+    const intervalId = setInterval(updateCurrentHour, 60000);
     
     return () => clearInterval(intervalId);
   }, []);
@@ -121,11 +120,9 @@ export const PublicReservationGrid = ({ date }: { date: Date }) => {
 
     if (blocked) {
       return (
-        <div className="h-full bg-destructive/30 border-2 border-destructive/60 flex items-center justify-center p-2 text-center">
-          <div className="w-full">
-            <div className="font-bold text-[11px] leading-tight">BLOQUÉ</div>
-            <div className="text-[9px] text-muted-foreground mt-1 truncate">{blocked.reason}</div>
-          </div>
+        <div className="h-full w-full bg-destructive/20 flex flex-col items-center justify-center p-1">
+          <span className="font-bold text-destructive text-xs">BLOQUÉ</span>
+          <span className="text-[8px] text-destructive/70 truncate max-w-full">{blocked.reason}</span>
         </div>
       );
     }
@@ -136,28 +133,26 @@ export const PublicReservationGrid = ({ date }: { date: Date }) => {
 
     if (reservation) {
       return (
-        <div className="h-full bg-accent border-2 border-accent-foreground/20 flex items-center justify-center p-2 text-center">
-          <div className="leading-tight w-full">
-            <div className="font-semibold text-[11px] truncate px-1">
-              {reservation.player1?.full_name || ''}
-            </div>
-            <div className="text-muted-foreground text-[9px] my-0.5">&</div>
-            <div className="font-semibold text-[11px] truncate px-1">
-              {reservation.player2?.full_name || ''}
-            </div>
-          </div>
+        <div className="h-full w-full bg-primary/20 flex flex-col items-center justify-center p-1">
+          <span className="font-semibold text-primary text-[10px] truncate max-w-full leading-tight">
+            {reservation.player1?.full_name || ''}
+          </span>
+          <span className="text-primary/60 text-[8px]">&</span>
+          <span className="font-semibold text-primary text-[10px] truncate max-w-full leading-tight">
+            {reservation.player2?.full_name || ''}
+          </span>
         </div>
       );
     }
 
-    // Available slot - empty
+    // Available slot - empty with subtle pattern
     return (
-      <div className="h-full bg-success/20 border-2 border-success/50"></div>
+      <div className="h-full w-full bg-emerald-500/10"></div>
     );
   };
 
   if (loading) {
-    return <Skeleton className="w-full h-96" />;
+    return <Skeleton className="w-full h-[500px]" />;
   }
 
   const allHours = getAllHours();
@@ -170,58 +165,81 @@ export const PublicReservationGrid = ({ date }: { date: Date }) => {
     date.getDate() === today.getDate();
 
   return (
-    <div className="w-full h-[calc(100vh-200px)] overflow-hidden">
-      <div className="h-full">
-        <div className="grid grid-cols-[60px_repeat(10,1fr)] gap-0.5 h-full">
-          {/* Empty corner cell */}
-          <div className="font-bold text-sm p-1 bg-muted border-r border-b"></div>
-          
-          {/* Court headers */}
-          {courts.map((court) => (
-            <div 
-              key={court.id} 
-              className="font-bold text-sm p-1 bg-muted text-center border-b"
-            >
-              {court.name}
-            </div>
-          ))}
-
-          {allHours.map((hour) => {
-            const isCurrentHour = isToday && hour === currentHour;
-            
-            return (
-              <>
-                {/* Hour labels */}
-                <div 
-                  key={`hour-${hour}`} 
-                  className={`font-bold text-sm p-1 flex items-center justify-center border-r ${
-                    isCurrentHour 
-                      ? 'bg-primary text-primary-foreground animate-pulse' 
-                      : 'bg-muted'
+    <div className="w-full overflow-x-auto">
+      <table className="w-full border-collapse min-w-[900px]">
+        <thead>
+          <tr>
+            {/* Corner cell - Court header */}
+            <th className="sticky left-0 z-20 bg-primary text-primary-foreground font-bold text-sm p-3 border border-border min-w-[120px]">
+              Terrain
+            </th>
+            {/* Hour headers */}
+            {allHours.map((hour) => {
+              const isCurrentHour = isToday && hour === currentHour;
+              return (
+                <th
+                  key={hour}
+                  className={`font-bold text-sm p-2 border border-border min-w-[70px] transition-all ${
+                    isCurrentHour
+                      ? 'bg-primary text-primary-foreground ring-2 ring-primary ring-offset-2'
+                      : 'bg-muted text-muted-foreground'
                   }`}
                 >
-                  {hour}h
-                  {isCurrentHour && (
-                    <span className="ml-1 text-[10px]">●</span>
-                  )}
+                  <div className="flex flex-col items-center">
+                    <span className="text-lg">{hour}h</span>
+                    {isCurrentHour && (
+                      <span className="text-[10px] animate-pulse">● maintenant</span>
+                    )}
+                  </div>
+                </th>
+              );
+            })}
+          </tr>
+        </thead>
+        <tbody>
+          {courts.map((court, index) => (
+            <tr key={court.id} className={index % 2 === 0 ? 'bg-background' : 'bg-muted/30'}>
+              {/* Court name - sticky left */}
+              <td className="sticky left-0 z-10 bg-secondary text-secondary-foreground font-bold text-sm p-3 border border-border">
+                <div className="flex items-center gap-2">
+                  <span className="w-8 h-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm font-bold">
+                    {court.court_number}
+                  </span>
+                  <span className="truncate">{court.name}</span>
                 </div>
-                
-                {/* Court slots */}
-                {courts.map((court) => (
-                  <Card 
-                    key={`${court.id}-${hour}`} 
-                    className={`overflow-hidden ${
-                      isCurrentHour 
-                        ? 'border-4 border-primary shadow-lg' 
-                        : 'border'
+              </td>
+              {/* Time slots */}
+              {allHours.map((hour) => {
+                const isCurrentHour = isToday && hour === currentHour;
+                return (
+                  <td
+                    key={`${court.id}-${hour}`}
+                    className={`border border-border h-[80px] p-0 transition-all ${
+                      isCurrentHour ? 'ring-2 ring-inset ring-primary bg-primary/5' : ''
                     }`}
                   >
                     {getSlotContent(court.id, hour)}
-                  </Card>
-                ))}
-              </>
-            );
-          })}
+                  </td>
+                );
+              })}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      
+      {/* Legend */}
+      <div className="flex items-center justify-center gap-6 mt-4 text-sm">
+        <div className="flex items-center gap-2">
+          <div className="w-5 h-5 bg-emerald-500/10 border border-border rounded"></div>
+          <span className="text-muted-foreground">Disponible</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="w-5 h-5 bg-primary/20 border border-border rounded"></div>
+          <span className="text-muted-foreground">Réservé</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="w-5 h-5 bg-destructive/20 border border-border rounded"></div>
+          <span className="text-muted-foreground">Bloqué</span>
         </div>
       </div>
     </div>
