@@ -279,21 +279,32 @@ const Admin = () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error("Non connecté");
 
-      for (const memberId of selectedMembers) {
-        await fetch(
-          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/delete-member`,
-          {
-            method: "POST",
-            headers: {
-              "Authorization": `Bearer ${session.access_token}`,
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({ userId: memberId }),
-          }
-        );
+      const userIds = Array.from(selectedMembers);
+      
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/delete-member`,
+        {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${session.access_token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ userIds }),
+        }
+      );
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || "Erreur lors de la suppression");
       }
 
-      toast.success(`${selectedMembers.size} membre(s) supprimé(s)`);
+      if (result.failed > 0) {
+        toast.warning(`${result.deleted} membre(s) supprimé(s), ${result.failed} échec(s)`);
+      } else {
+        toast.success(`${result.deleted} membre(s) supprimé(s)`);
+      }
+      
       setSelectedMembers(new Set());
       fetchData();
     } catch (error) {
