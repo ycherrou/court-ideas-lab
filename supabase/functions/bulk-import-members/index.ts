@@ -2,6 +2,8 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.75.0'
 import { corsHeaders } from '../_shared/cors.ts'
 
 Deno.serve(async (req) => {
+  console.log('bulk-import-members: Request received', req.method)
+  
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }
@@ -18,13 +20,25 @@ Deno.serve(async (req) => {
     })
 
     // Verify the caller is an admin
-    const authHeader = req.headers.get('Authorization')!
+    const authHeader = req.headers.get('Authorization')
+    console.log('Auth header present:', !!authHeader)
+    
+    if (!authHeader) {
+      console.error('No Authorization header')
+      return new Response(JSON.stringify({ error: 'Token manquant' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      })
+    }
+    
     const token = authHeader.replace('Bearer ', '')
     const supabaseClient = createClient(supabaseUrl, Deno.env.get('SUPABASE_ANON_KEY')!, {
       global: { headers: { Authorization: authHeader } }
     })
     
     const { data: { user }, error: authError } = await supabaseClient.auth.getUser(token)
+    console.log('User auth result:', user?.id, 'Error:', authError?.message)
+    
     if (authError || !user) {
       console.error('Auth error:', authError)
       return new Response(JSON.stringify({ error: 'Non autorisé' }), {
@@ -34,12 +48,14 @@ Deno.serve(async (req) => {
     }
 
     // Check if user is admin
-    const { data: roleData } = await supabaseClient
+    const { data: roleData, error: roleError } = await supabaseClient
       .from('user_roles')
       .select('role')
       .eq('user_id', user.id)
       .eq('role', 'admin')
       .maybeSingle()
+    
+    console.log('Role check for user', user.id, ':', roleData, 'Error:', roleError?.message)
 
     if (!roleData) {
       console.error('User is not admin')
