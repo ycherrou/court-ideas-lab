@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Progress } from "@/components/ui/progress";
 import { Download, Upload, FileText, Eye, EyeOff } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -21,11 +22,15 @@ interface ImportResult {
   role: string;
 }
 
+const BATCH_SIZE = 400;
+
 export const BulkImportModal = ({ open, onOpenChange, onSuccess }: BulkImportModalProps) => {
   const [file, setFile] = useState<File | null>(null);
   const [parsedMembers, setParsedMembers] = useState<any[]>([]);
   const [importing, setImporting] = useState(false);
   const [progress, setProgress] = useState(0);
+  const [currentBatch, setCurrentBatch] = useState(0);
+  const [totalBatches, setTotalBatches] = useState(0);
   const [results, setResults] = useState<{ success: ImportResult[], errors: any[] } | null>(null);
   const [showPins, setShowPins] = useState(false);
 
@@ -53,7 +58,8 @@ export const BulkImportModal = ({ open, onOpenChange, onSuccess }: BulkImportMod
         }));
 
         setParsedMembers(members);
-        toast.success(`${members.length} membres détectés`);
+        const batches = Math.ceil(members.length / BATCH_SIZE);
+        toast.success(`${members.length} membres détectés (${batches} lot${batches > 1 ? 's' : ''})`);
       } catch (error) {
         toast.error("Erreur lors de la lecture du fichier");
         console.error(error);
@@ -88,22 +94,72 @@ export const BulkImportModal = ({ open, onOpenChange, onSuccess }: BulkImportMod
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
         toast.error("Session expirée");
+        setImporting(false);
         return;
       }
 
-      const { data, error } = await supabase.functions.invoke("bulk-import-members", {
-        body: { members: parsedMembers },
-        headers: {
-          Authorization: `Bearer ${session.access_token}`
-        }
-      });
+      // Split members into batches
+      const batches: any[][] = [];
+      for (let i = 0; i < parsedMembers.length; i += BATCH_SIZE) {
+        batches.push(parsedMembers.slice(i, i + BATCH_SIZE));
+      }
 
-      if (error) throw error;
-
-      setResults(data);
-      toast.success(`Import terminé: ${data.success.length} réussis, ${data.errors.length} erreurs`);
+      setTotalBatches(batches.length);
       
-      if (data.success.length > 0) {
+      // Accumulate results from all batches
+      const allSuccess: ImportResult[] = [];
+      const allErrors: any[] = [];
+
+      for (let i = 0; i < batches.length; i++) {
+        setCurrentBatch(i + 1);
+        setProgress(Math.round((i / batches.length) * 100));
+
+        try {
+          const { data, error } = await supabase.functions.invoke("bulk-import-members", {
+            body: { members: batches[i] },
+            headers: {
+              Authorization: `Bearer ${session.access_token}`
+            }
+          });
+
+          if (error) {
+            // If batch fails completely, add all members as errors
+            batches[i].forEach(member => {
+              allErrors.push({
+                ...member,
+                error: error.message || "Erreur lors de l'import du lot"
+              });
+            });
+          } else {
+            // Accumulate successful imports and errors
+            if (data.success) {
+              allSuccess.push(...data.success);
+            }
+            if (data.errors) {
+              allErrors.push(...data.errors);
+            }
+          }
+        } catch (batchError: any) {
+          // Handle network or other errors for this batch
+          batches[i].forEach(member => {
+            allErrors.push({
+              ...member,
+              error: batchError.message || "Erreur réseau"
+            });
+          });
+        }
+
+        // Small delay between batches to avoid overwhelming the server
+        if (i < batches.length - 1) {
+          await new Promise(resolve => setTimeout(resolve, 500));
+        }
+      }
+
+      setProgress(100);
+      setResults({ success: allSuccess, errors: allErrors });
+      toast.success(`Import terminé: ${allSuccess.length} réussis, ${allErrors.length} erreurs`);
+      
+      if (allSuccess.length > 0) {
         onSuccess();
       }
     } catch (error: any) {
@@ -111,7 +167,8 @@ export const BulkImportModal = ({ open, onOpenChange, onSuccess }: BulkImportMod
       toast.error(error.message || "Erreur lors de l'import");
     } finally {
       setImporting(false);
-      setProgress(0);
+      setCurrentBatch(0);
+      setTotalBatches(0);
     }
   };
 
@@ -152,12 +209,28 @@ export const BulkImportModal = ({ open, onOpenChange, onSuccess }: BulkImportMod
     setParsedMembers([]);
     setResults(null);
     setProgress(0);
+    setCurrentBatch(0);
+    setTotalBatches(0);
     setShowPins(false);
   };
 
   const handleClose = () => {
     resetModal();
     onOpenChange(false);
+  };
+
+  const getBatchInfo = () => {
+    const batches = Math.ceil(parsedMembers.length / BATCH_SIZE);
+    if (batches <= 1) return null;
+    
+    const batchSizes = [];
+    for (let i = 0; i < batches; i++) {
+      const start = i * BATCH_SIZE;
+      const end = Math.min(start + BATCH_SIZE, parsedMembers.length);
+      batchSizes.push(end - start);
+    }
+    
+    return `${batches} lots (${batchSizes.join(' + ')} membres)`;
   };
 
   return (
@@ -240,15 +313,34 @@ export const BulkImportModal = ({ open, onOpenChange, onSuccess }: BulkImportMod
                   )}
                 </div>
 
+                {getBatchInfo() && (
+                  <div className="text-sm text-muted-foreground bg-muted/50 p-3 rounded-lg">
+                    Import automatique en {getBatchInfo()}
+                  </div>
+                )}
+
+                {importing && (
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-sm">
+                      <span>Import lot {currentBatch}/{totalBatches} en cours...</span>
+                      <span>{progress}%</span>
+                    </div>
+                    <Progress value={progress} className="h-2" />
+                  </div>
+                )}
+
                 <div className="flex gap-2">
                   <Button
                     onClick={handleImport}
                     disabled={importing}
                     className="flex-1"
                   >
-                    {importing ? `Import en cours... ${progress}%` : `Importer ${parsedMembers.length} membres`}
+                    {importing 
+                      ? `Import en cours... (lot ${currentBatch}/${totalBatches})`
+                      : `Importer ${parsedMembers.length} membres`
+                    }
                   </Button>
-                  <Button variant="outline" onClick={resetModal}>
+                  <Button variant="outline" onClick={resetModal} disabled={importing}>
                     Annuler
                   </Button>
                 </div>
@@ -259,11 +351,11 @@ export const BulkImportModal = ({ open, onOpenChange, onSuccess }: BulkImportMod
           <div className="space-y-4">
             <div className="grid grid-cols-3 gap-4 text-center">
               <div className="p-4 border rounded-lg">
-                <p className="text-2xl font-bold">{results.success.length}</p>
+                <p className="text-2xl font-bold text-green-600">{results.success.length}</p>
                 <p className="text-sm text-muted-foreground">Réussis</p>
               </div>
               <div className="p-4 border rounded-lg">
-                <p className="text-2xl font-bold">{results.errors.length}</p>
+                <p className="text-2xl font-bold text-destructive">{results.errors.length}</p>
                 <p className="text-sm text-muted-foreground">Erreurs</p>
               </div>
               <div className="p-4 border rounded-lg">
