@@ -45,29 +45,64 @@ Deno.serve(async (req) => {
       throw new Error("Accès non autorisé");
     }
 
-    const { userId } = await req.json();
+    const body = await req.json();
+    
+    // Support both single userId and array of userIds
+    const userIds: string[] = body.userIds || (body.userId ? [body.userId] : []);
 
-    if (!userId) {
+    if (userIds.length === 0) {
       throw new Error("ID utilisateur manquant");
     }
 
-    // Supprimer l'utilisateur
-    const { error: deleteError } = await supabaseAdmin.auth.admin.deleteUser(
-      userId
-    );
+    console.log(`Suppression de ${userIds.length} utilisateur(s)`);
 
-    if (deleteError) {
-      throw deleteError;
+    const results = {
+      success: [] as string[],
+      failed: [] as { id: string; error: string }[],
+    };
+
+    // Traiter les suppressions par lots de 5 pour éviter les timeouts
+    const batchSize = 5;
+    for (let i = 0; i < userIds.length; i += batchSize) {
+      const batch = userIds.slice(i, i + batchSize);
+      
+      const deletePromises = batch.map(async (userId) => {
+        try {
+          const { error: deleteError } = await supabaseAdmin.auth.admin.deleteUser(userId);
+          
+          if (deleteError) {
+            console.error(`Erreur suppression ${userId}:`, deleteError.message);
+            results.failed.push({ id: userId, error: deleteError.message });
+          } else {
+            console.log(`Utilisateur ${userId} supprimé`);
+            results.success.push(userId);
+          }
+        } catch (err) {
+          const errorMessage = err instanceof Error ? err.message : "Erreur inconnue";
+          console.error(`Exception suppression ${userId}:`, errorMessage);
+          results.failed.push({ id: userId, error: errorMessage });
+        }
+      });
+
+      await Promise.all(deletePromises);
     }
 
+    console.log(`Résultat: ${results.success.length} supprimé(s), ${results.failed.length} échec(s)`);
+
     return new Response(
-      JSON.stringify({ success: true }),
+      JSON.stringify({
+        success: true,
+        deleted: results.success.length,
+        failed: results.failed.length,
+        details: results,
+      }),
       {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
         status: 200,
       }
     );
   } catch (error) {
+    console.error("Erreur delete-member:", error);
     return new Response(
       JSON.stringify({ error: error instanceof Error ? error.message : "Erreur inconnue" }),
       {
