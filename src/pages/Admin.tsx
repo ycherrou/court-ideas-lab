@@ -13,7 +13,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
-import { ArrowLeft, UserPlus, Trash2, Calendar, Ban, Edit, Search, Upload, Eye, EyeOff } from "lucide-react";
+import { ArrowLeft, UserPlus, Trash2, Calendar, Ban, Edit, Search, Upload, Eye, EyeOff, KeyRound } from "lucide-react";
 import { BulkImportModal } from "@/components/BulkImportModal";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -340,6 +340,30 @@ const Admin = () => {
     setShowPins(newShowPins);
   };
 
+  const handleResetPin = async (memberId: string, memberName: string) => {
+    if (!confirm(`Réinitialiser le PIN de ${memberName} ?`)) return;
+
+    try {
+      // Générer un nouveau PIN à 4 chiffres
+      const newPin = Math.floor(1000 + Math.random() * 9000).toString();
+
+      const { error } = await supabase
+        .from("profiles")
+        .update({ 
+          temporary_pin: newPin,
+          must_change_password: true 
+        })
+        .eq("id", memberId);
+
+      if (error) throw error;
+
+      toast.success(`PIN réinitialisé pour ${memberName}\nNouveau PIN: ${newPin}`, { duration: 10000 });
+      fetchData();
+    } catch (error) {
+      toast.error("Erreur lors de la réinitialisation du PIN");
+    }
+  };
+
   const handleCreateBlockedSlot = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
@@ -567,13 +591,23 @@ const Admin = () => {
                                 setSelectedMember(member);
                                 setEditMemberOpen(true);
                               }}
+                              title="Modifier"
                             >
                               <Edit className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleResetPin(member.id, member.full_name)}
+                              title="Réinitialiser le PIN"
+                            >
+                              <KeyRound className="h-4 w-4" />
                             </Button>
                             <Button
                               variant="destructive"
                               size="sm"
                               onClick={() => handleDeleteMember(member.id)}
+                              title="Supprimer"
                             >
                               <Trash2 className="h-4 w-4" />
                             </Button>
