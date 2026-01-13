@@ -96,11 +96,15 @@ const PublicDisplay = () => {
       </main>
 
       {/* Footer compact */}
-      <footer className="bg-muted border-t px-4 py-1 shrink-0">
+      <footer className="bg-muted border-t px-4 py-2 shrink-0">
         <div className="flex items-center justify-between text-xs text-muted-foreground">
           <div className="flex items-center gap-2">
             <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></div>
             <span>Actualisation automatique</span>
+          </div>
+          <div className="flex flex-col items-center text-sm font-medium text-foreground">
+            <span>Pour réserver : <span className="text-primary">reservation.rtcma.club</span></span>
+            <span className="text-muted-foreground text-xs">Login disponible chez l'assistante</span>
           </div>
           <span>Mise à jour : {format(lastRefresh, 'HH:mm:ss')}</span>
         </div>
