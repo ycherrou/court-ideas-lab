@@ -357,6 +357,9 @@ const Admin = () => {
 
       if (error) throw error;
 
+      // Afficher automatiquement le PIN après réinitialisation
+      setShowPins(prev => new Set([...prev, memberId]));
+      
       toast.success(`PIN réinitialisé pour ${memberName}\nNouveau PIN: ${newPin}`, { duration: 10000 });
       fetchData();
     } catch (error) {
