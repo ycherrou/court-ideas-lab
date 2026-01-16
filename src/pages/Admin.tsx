@@ -42,9 +42,15 @@ const Admin = () => {
   const [showPins, setShowPins] = useState<Set<string>>(new Set());
 
   useEffect(() => {
-    if (!authLoading && !user) {
+    // Attendre que l'auth ET le rôle soient résolus avant de rediriger
+    if (authLoading || roleLoading) return;
+
+    if (!user) {
       navigate("/auth");
-    } else if (!roleLoading && !isAdmin) {
+      return;
+    }
+
+    if (!isAdmin) {
       navigate("/");
       toast.error("Accès non autorisé");
     }
