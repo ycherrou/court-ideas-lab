@@ -138,17 +138,34 @@ Deno.serve(async (req) => {
       return Math.floor(1000 + Math.random() * 9000).toString();
     };
 
-    // Récupérer tous les usernames existants
+    // Récupérer tous les usernames et noms existants
     const { data: existingProfiles } = await supabaseAdmin
       .from('profiles')
-      .select('username');
+      .select('username, full_name');
     
     const existingUsernames = new Set(
       existingProfiles?.map(p => p.username).filter(Boolean) || []
     );
 
+    // Créer un Set de noms normalisés pour détecter les doublons
+    const normalizeForComparison = (name: string): string => {
+      return name
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .toLowerCase()
+        .replace(/[^a-z]/g, "")
+        .trim();
+    };
+
+    const existingNormalizedNames = new Set(
+      existingProfiles?.map(p => normalizeForComparison(p.full_name)).filter(Boolean) || []
+    );
+
+    console.log(`Found ${existingNormalizedNames.size} existing members in database`);
+
     const validRoles = ['player', 'admin', 'coach', 'super_coach'];
     const results: Array<{login: string, pin: string, fullName: string, email: string, role: string}> = [];
+    const skipped: Array<{fullName: string, email: string, reason: string}> = [];
     const errors: Array<{fullName: string, email: string, error: string}> = [];
 
     // Traiter les membres en batch de 50 pour éviter les timeouts
@@ -166,7 +183,7 @@ Deno.serve(async (req) => {
           // Validation
           if (!fullName || fullName.trim() === '') {
             return {
-              success: false,
+              type: 'error',
               error: {
                 fullName: fullName || 'Non spécifié',
                 email: email || 'Non spécifié',
@@ -174,6 +191,23 @@ Deno.serve(async (req) => {
               }
             };
           }
+
+          // Vérifier si le membre existe déjà (par nom normalisé)
+          const normalizedName = normalizeForComparison(fullName);
+          if (existingNormalizedNames.has(normalizedName)) {
+            console.log(`Skipping existing member: ${fullName}`);
+            return {
+              type: 'skipped',
+              skipped: {
+                fullName,
+                email: email || 'Non spécifié',
+                reason: 'Membre déjà présent dans la base'
+              }
+            };
+          }
+
+          // Ajouter au Set pour éviter les doublons dans le même fichier
+          existingNormalizedNames.add(normalizedName);
 
           // Valider le rôle
           const assignedRole = role && validRoles.includes(role.toLowerCase()) 
@@ -236,7 +270,7 @@ Deno.serve(async (req) => {
             });
 
           return {
-            success: true,
+            type: 'success',
             result: {
               login,
               pin,
@@ -248,7 +282,7 @@ Deno.serve(async (req) => {
 
         } catch (error) {
           return {
-            success: false,
+            type: 'error',
             error: {
               fullName: member.fullName || 'Inconnu',
               email: member.email || 'Non spécifié',
@@ -260,25 +294,29 @@ Deno.serve(async (req) => {
 
       const batchResults = await Promise.all(batchPromises);
       
-      // Séparer les succès et les erreurs
+      // Séparer les succès, ignorés et erreurs
       batchResults.forEach(result => {
-        if (result.success && result.result) {
+        if (result.type === 'success' && result.result) {
           results.push(result.result);
-        } else if (!result.success && result.error) {
+        } else if (result.type === 'skipped' && result.skipped) {
+          skipped.push(result.skipped);
+        } else if (result.type === 'error' && result.error) {
           errors.push(result.error);
         }
       });
     }
 
-    console.log(`Import completed: ${results.length} success, ${errors.length} errors`);
+    console.log(`Import completed: ${results.length} success, ${skipped.length} skipped, ${errors.length} errors`);
 
     return new Response(
       JSON.stringify({
         success: results,
+        skipped: skipped,
         errors: errors,
         summary: {
           total: members.length,
-          successful: results.length,
+          created: results.length,
+          skipped: skipped.length,
           failed: errors.length
         }
       }),
