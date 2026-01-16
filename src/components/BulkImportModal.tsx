@@ -22,6 +22,12 @@ interface ImportResult {
   role: string;
 }
 
+interface SkippedMember {
+  fullName: string;
+  email: string;
+  reason: string;
+}
+
 const BATCH_SIZE = 400;
 
 export const BulkImportModal = ({ open, onOpenChange, onSuccess }: BulkImportModalProps) => {
@@ -31,7 +37,7 @@ export const BulkImportModal = ({ open, onOpenChange, onSuccess }: BulkImportMod
   const [progress, setProgress] = useState(0);
   const [currentBatch, setCurrentBatch] = useState(0);
   const [totalBatches, setTotalBatches] = useState(0);
-  const [results, setResults] = useState<{ success: ImportResult[], errors: any[] } | null>(null);
+  const [results, setResults] = useState<{ success: ImportResult[], skipped: SkippedMember[], errors: any[] } | null>(null);
   const [showPins, setShowPins] = useState(false);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -108,6 +114,7 @@ export const BulkImportModal = ({ open, onOpenChange, onSuccess }: BulkImportMod
       
       // Accumulate results from all batches
       const allSuccess: ImportResult[] = [];
+      const allSkipped: SkippedMember[] = [];
       const allErrors: any[] = [];
 
       for (let i = 0; i < batches.length; i++) {
@@ -131,9 +138,12 @@ export const BulkImportModal = ({ open, onOpenChange, onSuccess }: BulkImportMod
               });
             });
           } else {
-            // Accumulate successful imports and errors
+            // Accumulate successful imports, skipped and errors
             if (data.success) {
               allSuccess.push(...data.success);
+            }
+            if (data.skipped) {
+              allSkipped.push(...data.skipped);
             }
             if (data.errors) {
               allErrors.push(...data.errors);
@@ -156,8 +166,13 @@ export const BulkImportModal = ({ open, onOpenChange, onSuccess }: BulkImportMod
       }
 
       setProgress(100);
-      setResults({ success: allSuccess, errors: allErrors });
-      toast.success(`Import terminé: ${allSuccess.length} réussis, ${allErrors.length} erreurs`);
+      setResults({ success: allSuccess, skipped: allSkipped, errors: allErrors });
+      
+      const messages: string[] = [];
+      if (allSuccess.length > 0) messages.push(`${allSuccess.length} créé(s)`);
+      if (allSkipped.length > 0) messages.push(`${allSkipped.length} ignoré(s)`);
+      if (allErrors.length > 0) messages.push(`${allErrors.length} erreur(s)`);
+      toast.success(`Import terminé: ${messages.join(', ')}`);
       
       if (allSuccess.length > 0) {
         onSuccess();
@@ -197,6 +212,22 @@ export const BulkImportModal = ({ open, onOpenChange, onSuccess }: BulkImportMod
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Erreurs");
     XLSX.writeFile(wb, "erreurs_import.xlsx");
+    toast.success("Fichier téléchargé");
+  };
+
+  const downloadSkipped = () => {
+    if (!results || results.skipped.length === 0) return;
+
+    const skippedData = results.skipped.map(s => ({
+      "Nom complet": s.fullName,
+      "Email": s.email,
+      "Raison": s.reason
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(skippedData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Ignorés");
+    XLSX.writeFile(wb, "membres_ignores.xlsx");
     toast.success("Fichier téléchargé");
   };
 
@@ -349,10 +380,14 @@ export const BulkImportModal = ({ open, onOpenChange, onSuccess }: BulkImportMod
           </div>
         ) : (
           <div className="space-y-4">
-            <div className="grid grid-cols-3 gap-4 text-center">
+            <div className="grid grid-cols-4 gap-4 text-center">
               <div className="p-4 border rounded-lg">
                 <p className="text-2xl font-bold text-green-600">{results.success.length}</p>
-                <p className="text-sm text-muted-foreground">Réussis</p>
+                <p className="text-sm text-muted-foreground">Créés</p>
+              </div>
+              <div className="p-4 border rounded-lg">
+                <p className="text-2xl font-bold text-amber-500">{results.skipped.length}</p>
+                <p className="text-sm text-muted-foreground">Ignorés</p>
               </div>
               <div className="p-4 border rounded-lg">
                 <p className="text-2xl font-bold text-destructive">{results.errors.length}</p>
@@ -403,6 +438,36 @@ export const BulkImportModal = ({ open, onOpenChange, onSuccess }: BulkImportMod
                 <Button onClick={downloadCredentials} className="w-full">
                   <Download className="mr-2 h-4 w-4" />
                   Télécharger les identifiants
+                </Button>
+              </>
+            )}
+
+            {results.skipped.length > 0 && (
+              <>
+                <h3 className="font-semibold text-amber-600">Membres ignorés (déjà présents)</h3>
+                <div className="border rounded-lg overflow-hidden max-h-48 overflow-y-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Nom complet</TableHead>
+                        <TableHead>Email</TableHead>
+                        <TableHead>Raison</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {results.skipped.map((skipped, index) => (
+                        <TableRow key={index}>
+                          <TableCell>{skipped.fullName}</TableCell>
+                          <TableCell>{skipped.email}</TableCell>
+                          <TableCell className="text-sm text-amber-600">{skipped.reason}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+                <Button variant="outline" onClick={downloadSkipped} className="w-full">
+                  <Download className="mr-2 h-4 w-4" />
+                  Télécharger les ignorés
                 </Button>
               </>
             )}
