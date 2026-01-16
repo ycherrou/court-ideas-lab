@@ -5,9 +5,10 @@ import { useUserRole } from "@/hooks/useUserRole";
 import { useCoachRestrictions } from "@/hooks/useCoachRestrictions";
 import { ReservationGrid } from "@/components/ReservationGrid";
 import { BookingModal } from "@/components/BookingModal";
+import { ChangePasswordDialog } from "@/components/ChangePasswordDialog";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Calendar, LogOut, Settings, ChevronLeft, ChevronRight } from "lucide-react";
+import { Calendar, LogOut, Settings, ChevronLeft, ChevronRight, KeyRound } from "lucide-react";
 import { MobileNav } from "@/components/MobileNav";
 import { Carousel, CarouselContent, CarouselItem, CarouselApi } from "@/components/ui/carousel";
 import { addDays, format, startOfWeek } from "date-fns";
@@ -32,6 +33,7 @@ const Index = () => {
   const [api, setApi] = useState<CarouselApi>();
   const [currentSlide, setCurrentSlide] = useState(0);
   const [userName, setUserName] = useState<string>("");
+  const [changePasswordOpen, setChangePasswordOpen] = useState(false);
   
   // Generate 7 days starting from today
   const today = new Date();
@@ -131,6 +133,9 @@ const Index = () => {
                 Mes réservations
               </Button>
             )}
+            <Button variant="ghost" onClick={() => setChangePasswordOpen(true)} title="Changer le mot de passe">
+              <KeyRound className="h-4 w-4" />
+            </Button>
             <Button variant="ghost" onClick={signOut}>
               <LogOut className="h-4 w-4" />
             </Button>
@@ -237,6 +242,11 @@ const Index = () => {
         prefilledDate={prefilledBooking?.date}
         prefilledCourtId={prefilledBooking?.courtId}
         prefilledTime={prefilledBooking?.time}
+      />
+
+      <ChangePasswordDialog
+        open={changePasswordOpen}
+        onOpenChange={setChangePasswordOpen}
       />
     </div>
   );
