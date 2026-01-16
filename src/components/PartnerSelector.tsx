@@ -23,6 +23,7 @@ interface PartnerSelectorProps {
   selectedDate: Date;
   value: string;
   onValueChange: (value: string) => void;
+  showCoachDateWarning?: boolean; // Afficher l'avertissement si date > J+1
 }
 
 interface Partner {
@@ -45,6 +46,18 @@ export function PartnerSelector({
   const [favoriteIds, setFavoriteIds] = useState<Set<string>>(new Set());
   const [coachRoles, setCoachRoles] = useState<Map<string, string>>(new Map());
   const { toast } = useToast();
+
+  // Vérifier si la date sélectionnée dépasse J+1 (restriction coach)
+  const isDateBeyondTomorrow = (): boolean => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    tomorrow.setHours(23, 59, 59, 999);
+    return selectedDate > tomorrow;
+  };
+
+  const coachDateRestricted = isDateBeyondTomorrow();
 
   // Load data when modal opens
   useEffect(() => {
@@ -206,30 +219,45 @@ export function PartnerSelector({
             {/* Favorites Section */}
             {favorites.length > 0 && !searchQuery && (
               <CommandGroup heading="⭐ Favoris">
-                {filterPartners(favorites).map((partner) => (
-                  <CommandItem
-                    key={partner.id}
-                    value={partner.id}
-                    onSelect={() => {
-                      onValueChange(partner.id);
-                      setOpen(false);
-                    }}
-                    className="flex items-center justify-between"
-                  >
-                    <span className={cn(value === partner.id && "font-medium")}>
-                      {partner.full_name}
-                      {coachRoles.get(partner.id) === 'coach' && ' 🎾'}
-                      {coachRoles.get(partner.id) === 'super_coach' && ' ⭐🎾'}
-                    </span>
-                    <Star
-                      className="h-4 w-4 cursor-pointer fill-yellow-400 text-yellow-400"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        toggleFavorite(partner.id);
+                {filterPartners(favorites).map((partner) => {
+                  const isCoach = coachRoles.has(partner.id);
+                  const isDisabled = isCoach && coachDateRestricted;
+                  return (
+                    <CommandItem
+                      key={partner.id}
+                      value={partner.id}
+                      onSelect={() => {
+                        if (isDisabled) {
+                          toast({ 
+                            description: "Réservation avec un coach possible uniquement pour aujourd'hui ou demain",
+                            variant: "destructive"
+                          });
+                          return;
+                        }
+                        onValueChange(partner.id);
+                        setOpen(false);
                       }}
-                    />
-                  </CommandItem>
-                ))}
+                      className={cn(
+                        "flex items-center justify-between",
+                        isDisabled && "opacity-50 cursor-not-allowed"
+                      )}
+                    >
+                      <span className={cn(value === partner.id && "font-medium")}>
+                        {partner.full_name}
+                        {coachRoles.get(partner.id) === 'coach' && ' 🎾'}
+                        {coachRoles.get(partner.id) === 'super_coach' && ' ⭐🎾'}
+                        {isDisabled && ' (J/J+1 uniquement)'}
+                      </span>
+                      <Star
+                        className="h-4 w-4 cursor-pointer fill-yellow-400 text-yellow-400"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          toggleFavorite(partner.id);
+                        }}
+                      />
+                    </CommandItem>
+                  );
+                })}
               </CommandGroup>
             )}
 
@@ -238,20 +266,81 @@ export function PartnerSelector({
               <CommandGroup heading="🕒 Récents">
                 {filterPartners(recents)
                   .filter((p) => !favoriteIds.has(p.id))
-                  .map((partner) => (
+                  .map((partner) => {
+                    const isCoach = coachRoles.has(partner.id);
+                    const isDisabled = isCoach && coachDateRestricted;
+                    return (
+                      <CommandItem
+                        key={partner.id}
+                        value={partner.id}
+                        onSelect={() => {
+                          if (isDisabled) {
+                            toast({ 
+                              description: "Réservation avec un coach possible uniquement pour aujourd'hui ou demain",
+                              variant: "destructive"
+                            });
+                            return;
+                          }
+                          onValueChange(partner.id);
+                          setOpen(false);
+                        }}
+                        className={cn(
+                          "flex items-center justify-between",
+                          isDisabled && "opacity-50 cursor-not-allowed"
+                        )}
+                      >
+                        <span className={cn(value === partner.id && "font-medium")}>
+                          {partner.full_name}
+                          {coachRoles.get(partner.id) === 'coach' && ' 🎾'}
+                          {coachRoles.get(partner.id) === 'super_coach' && ' ⭐🎾'}
+                          {isDisabled && ' (J/J+1 uniquement)'}
+                        </span>
+                        <Star
+                          className="h-4 w-4 cursor-pointer text-muted-foreground hover:text-yellow-400"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toggleFavorite(partner.id);
+                          }}
+                        />
+                      </CommandItem>
+                    );
+                  })}
+              </CommandGroup>
+            )}
+
+            {/* All Members Section */}
+            <CommandGroup heading="👥 Tous les membres">
+              {filterPartners(allPartners)
+                .filter((p) => !favoriteIds.has(p.id) && !recents.some((r) => r.id === p.id))
+                .slice(0, searchQuery ? 200 : 100)
+                .map((partner) => {
+                  const isCoach = coachRoles.has(partner.id);
+                  const isDisabled = isCoach && coachDateRestricted;
+                  return (
                     <CommandItem
                       key={partner.id}
                       value={partner.id}
                       onSelect={() => {
+                        if (isDisabled) {
+                          toast({ 
+                            description: "Réservation avec un coach possible uniquement pour aujourd'hui ou demain",
+                            variant: "destructive"
+                          });
+                          return;
+                        }
                         onValueChange(partner.id);
                         setOpen(false);
                       }}
-                      className="flex items-center justify-between"
+                      className={cn(
+                        "flex items-center justify-between",
+                        isDisabled && "opacity-50 cursor-not-allowed"
+                      )}
                     >
                       <span className={cn(value === partner.id && "font-medium")}>
                         {partner.full_name}
                         {coachRoles.get(partner.id) === 'coach' && ' 🎾'}
                         {coachRoles.get(partner.id) === 'super_coach' && ' ⭐🎾'}
+                        {isDisabled && ' (J/J+1 uniquement)'}
                       </span>
                       <Star
                         className="h-4 w-4 cursor-pointer text-muted-foreground hover:text-yellow-400"
@@ -261,39 +350,8 @@ export function PartnerSelector({
                         }}
                       />
                     </CommandItem>
-                  ))}
-              </CommandGroup>
-            )}
-
-            {/* All Members Section */}
-            <CommandGroup heading="👥 Tous les membres">
-              {filterPartners(allPartners)
-                .filter((p) => !favoriteIds.has(p.id) && !recents.some((r) => r.id === p.id))
-                .slice(0, searchQuery ? 200 : 100)
-                .map((partner) => (
-                  <CommandItem
-                    key={partner.id}
-                    value={partner.id}
-                    onSelect={() => {
-                      onValueChange(partner.id);
-                      setOpen(false);
-                    }}
-                    className="flex items-center justify-between"
-                  >
-                    <span className={cn(value === partner.id && "font-medium")}>
-                      {partner.full_name}
-                      {coachRoles.get(partner.id) === 'coach' && ' 🎾'}
-                      {coachRoles.get(partner.id) === 'super_coach' && ' ⭐🎾'}
-                    </span>
-                    <Star
-                      className="h-4 w-4 cursor-pointer text-muted-foreground hover:text-yellow-400"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        toggleFavorite(partner.id);
-                      }}
-                    />
-                  </CommandItem>
-                ))}
+                  );
+                })}
             </CommandGroup>
           </CommandList>
         </Command>

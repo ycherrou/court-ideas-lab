@@ -202,6 +202,31 @@ export const BookingModal = ({
     if (blocked.data) setBlockedSlotsData(blocked.data);
   };
 
+  // Vérifier si un joueur est un coach et si la date est trop lointaine
+  const checkCoachDateRestriction = async (playerId: string): Promise<boolean> => {
+    const { data: roles } = await supabase
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", playerId)
+      .in("role", ["coach", "super_coach"])
+      .maybeSingle();
+
+    if (roles) {
+      // C'est un coach - vérifier la date
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      
+      const tomorrow = new Date(today);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      tomorrow.setHours(23, 59, 59, 999);
+      
+      if (selectedDate && selectedDate > tomorrow) {
+        return false; // Date trop lointaine
+      }
+    }
+    return true; // OK
+  };
+
   const handleConfirm = async () => {
     if (!selectedDate || !selectedCourt || !selectedTime) {
       toast.error("Veuillez remplir tous les champs");
@@ -219,6 +244,21 @@ export const BookingModal = ({
     }
 
     setLoading(true);
+
+    // Vérifier la restriction de date pour les coachs
+    const player1Id = isAdmin ? selectedPlayer1 : userId;
+    const player2Id = isAdmin ? selectedPlayer2 : selectedPartner;
+
+    const [player1Ok, player2Ok] = await Promise.all([
+      checkCoachDateRestriction(player1Id),
+      checkCoachDateRestriction(player2Id),
+    ]);
+
+    if (!player1Ok || !player2Ok) {
+      toast.error("Les réservations avec un coach ne sont possibles que pour aujourd'hui ou demain");
+      setLoading(false);
+      return;
+    }
     try {
       // Fix timezone issue: use local date without timezone conversion
       const year = selectedDate.getFullYear();
