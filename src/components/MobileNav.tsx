@@ -1,10 +1,11 @@
-import { Calendar, Home, User, Settings, Menu, X, LogOut } from "lucide-react";
+import { Calendar, Home, User, Settings, Menu, X, LogOut, KeyRound } from "lucide-react";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "./ui/button";
 import { useUserRole } from "@/hooks/useUserRole";
 import { useAuth } from "@/hooks/useAuth";
 import { useCoachRestrictions } from "@/hooks/useCoachRestrictions";
+import { ChangePasswordDialog } from "./ChangePasswordDialog";
 
 interface MobileNavProps {
   userId?: string;
@@ -17,6 +18,7 @@ export function MobileNav({ userId, onBookingOpen }: MobileNavProps) {
   const { signOut } = useAuth();
   const { isCoach } = useCoachRestrictions(userId);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [changePasswordOpen, setChangePasswordOpen] = useState(false);
 
   return (
     <>
@@ -77,6 +79,17 @@ export function MobileNav({ userId, onBookingOpen }: MobileNavProps) {
               </Button>
             )}
             <Button
+              variant="outline"
+              className="w-full h-14 text-lg"
+              onClick={() => {
+                setChangePasswordOpen(true);
+                setMenuOpen(false);
+              }}
+            >
+              <KeyRound className="h-5 w-5 mr-3" />
+              Changer le mot de passe
+            </Button>
+            <Button
               variant="destructive"
               className="w-full h-14 text-lg"
               onClick={() => {
@@ -90,6 +103,11 @@ export function MobileNav({ userId, onBookingOpen }: MobileNavProps) {
           </div>
         </div>
       )}
+
+      <ChangePasswordDialog 
+        open={changePasswordOpen} 
+        onOpenChange={setChangePasswordOpen} 
+      />
     </>
   );
 }
