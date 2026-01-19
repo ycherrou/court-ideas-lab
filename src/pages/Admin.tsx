@@ -40,6 +40,7 @@ const Admin = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [bulkImportOpen, setBulkImportOpen] = useState(false);
   const [showPins, setShowPins] = useState<Set<string>>(new Set());
+  const [selectedCourts, setSelectedCourts] = useState<string[]>([]);
 
   useEffect(() => {
     // Attendre que l'auth ET le rôle soient résolus avant de rediriger
@@ -373,26 +374,49 @@ const Admin = () => {
     }
   };
 
+  const toggleCourtSelection = (courtId: string) => {
+    setSelectedCourts(prev => 
+      prev.includes(courtId) 
+        ? prev.filter(id => id !== courtId)
+        : [...prev, courtId]
+    );
+  };
+
+  const toggleAllCourts = (checked: boolean) => {
+    setSelectedCourts(checked ? courts.map(c => c.id) : []);
+  };
+
   const handleCreateBlockedSlot = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    
+    if (selectedCourts.length === 0) {
+      toast.error("Veuillez sélectionner au moins un terrain");
+      return;
+    }
+
     const formData = new FormData(e.currentTarget);
 
-    const courtIdValue = formData.get("courtId");
-    const data = {
+    const baseData = {
       date: formData.get("date") as string,
       start_time: formData.get("startTime") as string,
       end_time: formData.get("endTime") as string,
       reason: formData.get("reason") as string,
-      court_id: courtIdValue === "all" ? null : (courtIdValue as string),
       created_by: user?.id,
     };
 
-    const { error } = await supabase.from("blocked_slots").insert([data]);
+    // Créer un blocage pour chaque terrain sélectionné
+    const blocksToInsert = selectedCourts.map(courtId => ({
+      ...baseData,
+      court_id: courtId,
+    }));
+
+    const { error } = await supabase.from("blocked_slots").insert(blocksToInsert);
 
     if (error) {
       toast.error("Erreur lors de la création");
     } else {
-      toast.success("Créneaux bloqués avec succès");
+      toast.success(`${selectedCourts.length} terrain(s) bloqué(s) avec succès`);
+      setSelectedCourts([]);
       fetchData();
       (e.target as HTMLFormElement).reset();
     }
@@ -742,22 +766,6 @@ const Admin = () => {
                         <Input id="date" name="date" type="date" required />
                       </div>
                       <div>
-                        <Label htmlFor="courtId">Terrain</Label>
-                        <Select name="courtId" required>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Sélectionner" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="all">Tous les terrains</SelectItem>
-                            {courts.map((court) => (
-                              <SelectItem key={court.id} value={court.id}>
-                                {court.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div>
                         <Label htmlFor="startTime">Heure début</Label>
                         <Input id="startTime" name="startTime" type="time" required />
                       </div>
@@ -767,12 +775,41 @@ const Admin = () => {
                       </div>
                     </div>
                     <div>
+                      <Label className="mb-2 block">Terrain(s) à bloquer</Label>
+                      <div className="space-y-3">
+                        <div className="flex items-center gap-2">
+                          <Checkbox 
+                            id="all-courts" 
+                            checked={selectedCourts.length === courts.length && courts.length > 0}
+                            onCheckedChange={(checked) => toggleAllCourts(checked as boolean)}
+                          />
+                          <Label htmlFor="all-courts" className="font-medium cursor-pointer">
+                            Tous les terrains
+                          </Label>
+                        </div>
+                        <div className="grid grid-cols-3 gap-2 pl-4">
+                          {courts.map((court) => (
+                            <div key={court.id} className="flex items-center gap-2">
+                              <Checkbox 
+                                id={`court-${court.id}`}
+                                checked={selectedCourts.includes(court.id)}
+                                onCheckedChange={() => toggleCourtSelection(court.id)}
+                              />
+                              <Label htmlFor={`court-${court.id}`} className="cursor-pointer">
+                                {court.name}
+                              </Label>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                    <div>
                       <Label htmlFor="reason">Raison</Label>
                       <Textarea id="reason" name="reason" required />
                     </div>
-                    <Button type="submit">
+                    <Button type="submit" disabled={selectedCourts.length === 0}>
                       <Ban className="h-4 w-4 mr-2" />
-                      Bloquer les créneaux
+                      Bloquer {selectedCourts.length > 0 ? `${selectedCourts.length} terrain(s)` : "les créneaux"}
                     </Button>
                   </form>
                 </CardContent>
