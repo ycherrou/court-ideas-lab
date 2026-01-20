@@ -155,12 +155,12 @@ export const PublicReservationGrid = ({ date }: { date: Date }) => {
       <div 
         className="flex-1 grid"
         style={{
-          gridTemplateColumns: `100px repeat(${allHours.length}, 1fr)`,
+          gridTemplateColumns: `130px repeat(${allHours.length}, 1fr)`,
           gridTemplateRows: `40px repeat(${courts.length}, 1fr)`,
         }}
       >
         {/* Header: Corner */}
-        <div className="bg-primary text-primary-foreground font-bold text-xs flex items-center justify-center border border-border">
+        <div className="bg-primary text-primary-foreground font-bold text-sm flex items-center justify-center border border-border">
           Terrain
         </div>
         
@@ -188,13 +188,13 @@ export const PublicReservationGrid = ({ date }: { date: Date }) => {
             {/* Court name */}
             <div
               key={`court-${court.id}`}
-              className="bg-secondary text-secondary-foreground font-bold text-xs flex items-center gap-1 px-1 border border-border"
+              className="bg-secondary text-secondary-foreground font-bold text-sm flex items-center gap-2 px-2 border border-border"
             >
-              <span className="w-5 h-5 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-[10px] font-bold shrink-0">
+              <span className="w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-bold shrink-0">
                 {court.court_number}
               </span>
-              <span className="truncate text-[10px]">
-                {court.court_number === 10 ? 'Central' : `T${court.court_number}`}
+              <span className="truncate text-xs">
+                {court.court_number === 10 ? 'Central' : `Terrain ${court.court_number}`}
               </span>
             </div>
             
