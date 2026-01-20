@@ -4,6 +4,7 @@ import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { toast } from "sonner";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface Court {
   id: string;
@@ -32,7 +33,6 @@ interface BlockedSlot {
 
 const getFilteredHours = (date: Date) => {
   const now = new Date();
-  // Fix timezone issue - use local date
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, '0');
   const day = String(date.getDate()).padStart(2, '0');
@@ -43,13 +43,11 @@ const getFilteredHours = (date: Date) => {
   const todayDay = String(now.getDate()).padStart(2, '0');
   const todayString = `${todayYear}-${todayMonth}-${todayDay}`;
   
-  // Si c'est aujourd'hui, filtrer les heures passées
   if (dateString === todayString) {
     const currentHour = now.getHours();
     return Array.from({ length: 14 }, (_, i) => i + 7).filter(hour => hour >= currentHour);
   }
   
-  // Sinon, afficher toutes les heures
   return Array.from({ length: 14 }, (_, i) => i + 7);
 };
 
@@ -66,8 +64,8 @@ export const ReservationGrid = ({
   const [reservations, setReservations] = useState<Reservation[]>([]);
   const [blockedSlots, setBlockedSlots] = useState<BlockedSlot[]>([]);
   const [loading, setLoading] = useState(true);
+  const isMobile = useIsMobile();
 
-  // Fix timezone issue - use local date
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, '0');
   const day = String(date.getDate()).padStart(2, '0');
@@ -128,7 +126,6 @@ export const ReservationGrid = ({
 
   const getSlotContent = (courtId: string, courtName: string, hour: number) => {
     const timeStr = `${hour.toString().padStart(2, "0")}:00:00`;
-    const endTimeStr = `${(hour + 1).toString().padStart(2, "0")}:00:00`;
 
     const blocked = blockedSlots.find(
       (slot) =>
@@ -139,10 +136,10 @@ export const ReservationGrid = ({
 
     if (blocked) {
       return (
-        <div className="h-full bg-destructive/20 border-destructive/40 flex items-center justify-center p-0.5 md:p-2 text-center text-[8px] md:text-xs">
+        <div className="h-full bg-destructive/20 border-destructive/40 flex items-center justify-center p-0.5 text-center text-[8px] md:text-[10px]">
           <div>
             <div className="font-semibold">BLOQUÉ</div>
-            <div className="text-muted-foreground hidden md:block">{blocked.reason}</div>
+            <div className="text-muted-foreground hidden md:block text-[8px]">{blocked.reason}</div>
           </div>
         </div>
       );
@@ -159,7 +156,7 @@ export const ReservationGrid = ({
 
       return (
         <div
-          className={`h-full flex items-center justify-center p-0.5 md:p-2 text-center text-[8px] md:text-xs ${
+          className={`h-full flex items-center justify-center p-0.5 text-center text-[7px] md:text-[9px] ${
             isMyReservation ? "bg-primary/20 border-primary" : "bg-accent"
           }`}
         >
@@ -167,7 +164,7 @@ export const ReservationGrid = ({
             <div className="font-medium truncate">
               {reservation.player1?.full_name || ''}
             </div>
-            <div className="text-muted-foreground text-[6px] md:text-xs">&</div>
+            <div className="text-muted-foreground text-[6px] md:text-[8px]">&</div>
             <div className="font-medium truncate">
               {reservation.player2?.full_name || ''}
             </div>
@@ -176,16 +173,13 @@ export const ReservationGrid = ({
       );
     }
 
-    // Available slot - clickable
     return (
       <button
         onClick={() => onSlotClick?.(courtId, courtName, hour)}
-        className="h-full w-full bg-success/10 hover:bg-success/20 active:bg-success/30 border-success/40 flex items-center justify-center text-[8px] md:text-xs text-muted-foreground transition-colors cursor-pointer"
+        className="h-full w-full bg-success/10 hover:bg-success/20 active:bg-success/30 border-success/40 flex items-center justify-center text-[8px] md:text-[10px] text-muted-foreground transition-colors cursor-pointer"
       >
-        <div className="flex flex-col items-center">
-          <span className="hidden md:block">Disponible</span>
-          <span className="text-sm md:hidden">✓</span>
-        </div>
+        <span className="hidden md:block">Dispo</span>
+        <span className="md:hidden">✓</span>
       </button>
     );
   };
@@ -196,46 +190,83 @@ export const ReservationGrid = ({
 
   const filteredHours = getFilteredHours(date);
 
-  return (
-    <ScrollArea className="w-full h-[calc(100vh-280px)] md:h-[calc(100vh-220px)]">
-      <div className="min-w-max pb-6">
-        <div className="grid grid-cols-[50px_repeat(10,80px)] md:grid-cols-[100px_repeat(10,minmax(120px,1fr))] gap-0.5 md:gap-1">
-          {/* Empty corner cell - sticky */}
-          <div className="font-semibold p-1 md:p-2 bg-muted sticky top-0 left-0 z-20 border-r border-b"></div>
-          
-          {/* Court headers - sticky top */}
-          {courts.map((court) => (
-            <div 
-              key={court.id} 
-              className="font-semibold p-1 md:p-2 bg-muted text-center text-[10px] md:text-sm sticky top-0 z-10 border-b"
-            >
-              <span className="md:hidden">{court.court_number}</span>
-              <span className="hidden md:inline">{court.name.replace("Terrain ", "T")}</span>
-            </div>
-          ))}
-
-          {filteredHours.map((hour) => (
-            <>
-              {/* Hour labels - sticky left */}
+  // Mobile: keep scroll behavior
+  if (isMobile) {
+    return (
+      <ScrollArea className="w-full h-[calc(100vh-280px)]">
+        <div className="min-w-max pb-6">
+          <div className="grid grid-cols-[50px_repeat(10,80px)] gap-0.5">
+            <div className="font-semibold p-1 bg-muted sticky top-0 left-0 z-20 border-r border-b"></div>
+            {courts.map((court) => (
               <div 
-                key={`hour-${hour}`} 
-                className="font-medium p-1 md:p-2 bg-muted text-[10px] md:text-sm flex items-center justify-center sticky left-0 z-10 border-r"
+                key={court.id} 
+                className="font-semibold p-1 bg-muted text-center text-[10px] sticky top-0 z-10 border-b"
               >
-                {hour}h
+                {court.court_number}
               </div>
-              
-              {/* Court slots */}
-              {courts.map((court) => (
-                <Card key={`${court.id}-${hour}`} className="min-h-[50px] md:min-h-[80px] overflow-hidden border-0 rounded-none">
-                  {getSlotContent(court.id, court.name, hour)}
-                </Card>
-              ))}
-            </>
-          ))}
+            ))}
+            {filteredHours.map((hour) => (
+              <>
+                <div 
+                  key={`hour-${hour}`} 
+                  className="font-medium p-1 bg-muted text-[10px] flex items-center justify-center sticky left-0 z-10 border-r"
+                >
+                  {hour}h
+                </div>
+                {courts.map((court) => (
+                  <Card key={`${court.id}-${hour}`} className="min-h-[50px] overflow-hidden border-0 rounded-none">
+                    {getSlotContent(court.id, court.name, hour)}
+                  </Card>
+                ))}
+              </>
+            ))}
+          </div>
         </div>
+        <ScrollBar orientation="horizontal" />
+      </ScrollArea>
+    );
+  }
+
+  // Desktop: full grid without scroll
+  return (
+    <div className="w-full h-full flex flex-col">
+      <div 
+        className="flex-1 grid gap-[1px] bg-border"
+        style={{
+          gridTemplateColumns: `60px repeat(${courts.length}, 1fr)`,
+          gridTemplateRows: `32px repeat(${filteredHours.length}, 1fr)`,
+        }}
+      >
+        {/* Empty corner cell */}
+        <div className="font-semibold bg-muted flex items-center justify-center text-xs"></div>
+        
+        {/* Court headers */}
+        {courts.map((court) => (
+          <div 
+            key={court.id} 
+            className="font-semibold bg-muted text-center text-[10px] flex items-center justify-center"
+          >
+            {court.name.replace("Terrain ", "T")}
+          </div>
+        ))}
+
+        {/* Hours and slots */}
+        {filteredHours.map((hour) => (
+          <>
+            <div 
+              key={`hour-${hour}`} 
+              className="font-medium bg-muted text-[11px] flex items-center justify-center"
+            >
+              {hour}h
+            </div>
+            {courts.map((court) => (
+              <div key={`${court.id}-${hour}`} className="bg-background overflow-hidden">
+                {getSlotContent(court.id, court.name, hour)}
+              </div>
+            ))}
+          </>
+        ))}
       </div>
-      <ScrollBar orientation="horizontal" />
-      <ScrollBar orientation="vertical" />
-    </ScrollArea>
+    </div>
   );
 };

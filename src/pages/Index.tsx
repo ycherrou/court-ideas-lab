@@ -216,9 +216,9 @@ const Index = () => {
             </Button>
           </div>
           
-          <CarouselContent>
+          <CarouselContent className="h-[calc(100vh-220px)]">
             {weekDays.map((day, index) => (
-              <CarouselItem key={index}>
+              <CarouselItem key={index} className="h-full">
                 <ReservationGrid 
                   key={`${refreshKey}-${index}`} 
                   date={day} 
