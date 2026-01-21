@@ -138,6 +138,28 @@ Deno.serve(async (req) => {
       if (roleError) {
         console.error('Error assigning role:', roleError)
       }
+
+      // Logger la création du membre pour l'audit
+      try {
+        const { data: adminProfile } = await supabaseAdmin
+          .from('profiles')
+          .select('full_name')
+          .eq('id', user.id)
+          .single()
+
+        await supabaseAdmin.rpc('log_action', {
+          _performed_by: user.id,
+          _performer_name: adminProfile?.full_name || 'Admin',
+          _action_type: 'CREATE',
+          _entity_type: 'MEMBER',
+          _entity_id: data.user.id,
+          _old_values: null,
+          _new_values: { full_name: fullName, role: roleToAssign, login },
+          _description: `Création membre: ${fullName} (${roleToAssign})`
+        })
+      } catch (auditError) {
+        console.error('Error logging audit:', auditError)
+      }
     }
 
     return new Response(JSON.stringify({ 

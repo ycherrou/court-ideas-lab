@@ -56,6 +56,13 @@ Deno.serve(async (req) => {
 
     console.log(`Suppression de ${userIds.length} utilisateur(s)`);
 
+    // Récupérer le nom de l'admin pour l'audit
+    const { data: adminProfile } = await supabaseAdmin
+      .from('profiles')
+      .select('full_name')
+      .eq('id', user.id)
+      .single();
+
     const results = {
       success: [] as string[],
       failed: [] as { id: string; error: string }[],
@@ -68,6 +75,13 @@ Deno.serve(async (req) => {
       
       const deletePromises = batch.map(async (userId) => {
         try {
+          // Récupérer les infos du membre avant suppression pour l'audit
+          const { data: memberProfile } = await supabaseAdmin
+            .from('profiles')
+            .select('full_name, email')
+            .eq('id', userId)
+            .single();
+
           const { error: deleteError } = await supabaseAdmin.auth.admin.deleteUser(userId);
           
           if (deleteError) {
@@ -76,6 +90,22 @@ Deno.serve(async (req) => {
           } else {
             console.log(`Utilisateur ${userId} supprimé`);
             results.success.push(userId);
+
+            // Logger la suppression pour l'audit
+            try {
+              await supabaseAdmin.rpc('log_action', {
+                _performed_by: user.id,
+                _performer_name: adminProfile?.full_name || 'Admin',
+                _action_type: 'DELETE',
+                _entity_type: 'MEMBER',
+                _entity_id: userId,
+                _old_values: { full_name: memberProfile?.full_name, email: memberProfile?.email },
+                _new_values: null,
+                _description: `Suppression membre: ${memberProfile?.full_name || 'Inconnu'}`
+              });
+            } catch (auditError) {
+              console.error('Error logging audit:', auditError);
+            }
           }
         } catch (err) {
           const errorMessage = err instanceof Error ? err.message : "Erreur inconnue";
