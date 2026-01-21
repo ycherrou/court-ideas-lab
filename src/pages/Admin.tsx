@@ -503,10 +503,21 @@ const Admin = () => {
         `Réinitialisation PIN: ${memberName}`
       );
 
+      // Mettre à jour les membres localement immédiatement
+      setMembers(prevMembers => 
+        prevMembers.map(member => 
+          member.id === memberId 
+            ? { ...member, temporary_pin: newPin, must_change_password: true }
+            : member
+        )
+      );
+
       // Afficher automatiquement le PIN après réinitialisation
       setShowPins(prev => new Set([...prev, memberId]));
       
       toast.success(`PIN réinitialisé pour ${memberName}\nNouveau PIN: ${newPin}`, { duration: 10000 });
+      
+      // Rafraîchir en arrière-plan pour synchroniser
       fetchData();
     } catch (error) {
       toast.error("Erreur lors de la réinitialisation du PIN");
