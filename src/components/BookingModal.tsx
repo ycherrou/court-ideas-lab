@@ -67,6 +67,18 @@ export const BookingModal = ({
     return !!data;
   };
 
+  // Helper function to check if a user is a coach
+  const isCoach = async (playerId: string): Promise<boolean> => {
+    const { data } = await supabase
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", playerId)
+      .eq("role", "coach")
+      .maybeSingle();
+    
+    return !!data;
+  };
+
   // Empêcher l'ouverture si l'utilisateur est un coach
   useEffect(() => {
     if (open && currentUserIsCoach && !isAdmin) {
@@ -159,12 +171,13 @@ export const BookingModal = ({
     
     setSelectedDate(normalizedDate);
     
-    // Check for active reservation (pas pour les admins ni les super_coach)
+    // Check for active reservation (pas pour les admins, super_coach, ou coach)
     if (!isAdmin) {
-      // Vérifier si l'utilisateur est un super_coach
+      // Vérifier si l'utilisateur est un super_coach ou coach
       const userIsSuperCoach = await isSuperCoach(userId);
+      const userIsCoach = await isCoach(userId);
       
-      if (!userIsSuperCoach) {
+      if (!userIsSuperCoach && !userIsCoach) {
         // Fix timezone issue for date comparison
         const year = date.getFullYear();
         const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -331,9 +344,10 @@ export const BookingModal = ({
       const player1Id = isAdmin ? selectedPlayer1 : userId;
       const player2Id = isAdmin ? selectedPlayer2 : selectedPartner;
 
-      // Check player 1 (sauf si super_coach)
+      // Check player 1 (sauf si super_coach ou coach)
       const player1IsSuperCoach = await isSuperCoach(player1Id);
-      if (!player1IsSuperCoach) {
+      const player1IsCoach = await isCoach(player1Id);
+      if (!player1IsSuperCoach && !player1IsCoach) {
         const { data: player1ActiveRes } = await supabase
           .from("reservations")
           .select("*")
@@ -347,9 +361,10 @@ export const BookingModal = ({
         }
       }
 
-      // Check player 2 (sauf si super_coach)
+      // Check player 2 (sauf si super_coach ou coach)
       const player2IsSuperCoach = await isSuperCoach(player2Id);
-      if (!player2IsSuperCoach) {
+      const player2IsCoach = await isCoach(player2Id);
+      if (!player2IsSuperCoach && !player2IsCoach) {
         const { data: player2ActiveRes } = await supabase
           .from("reservations")
           .select("*")
