@@ -55,6 +55,18 @@ export const BookingModal = ({
     });
   };
 
+  // Helper function to check if a user is a super_coach
+  const isSuperCoach = async (playerId: string): Promise<boolean> => {
+    const { data } = await supabase
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", playerId)
+      .eq("role", "super_coach")
+      .maybeSingle();
+    
+    return !!data;
+  };
+
   // Empêcher l'ouverture si l'utilisateur est un coach
   useEffect(() => {
     if (open && currentUserIsCoach && !isAdmin) {
@@ -147,30 +159,35 @@ export const BookingModal = ({
     
     setSelectedDate(normalizedDate);
     
-    // Check for active reservation (pas pour les admins créant pour les coachs)
+    // Check for active reservation (pas pour les admins ni les super_coach)
     if (!isAdmin) {
-      // Fix timezone issue for date comparison
-      const year = date.getFullYear();
-      const month = String(date.getMonth() + 1).padStart(2, '0');
-      const day = String(date.getDate()).padStart(2, '0');
-      const dateStr = `${year}-${month}-${day}`;
+      // Vérifier si l'utilisateur est un super_coach
+      const userIsSuperCoach = await isSuperCoach(userId);
       
-      const today = new Date();
-      const todayYear = today.getFullYear();
-      const todayMonth = String(today.getMonth() + 1).padStart(2, '0');
-      const todayDay = String(today.getDate()).padStart(2, '0');
-      const todayStr = `${todayYear}-${todayMonth}-${todayDay}`;
-      const currentTime = `${String(today.getHours()).padStart(2, '0')}:${String(today.getMinutes()).padStart(2, '0')}:00`;
-      
-      const { data: activeRes } = await supabase
-        .from("reservations")
-        .select("*")
-        .or(`player1_id.eq.${userId},player2_id.eq.${userId}`)
-        .gte('date', todayStr);
+      if (!userIsSuperCoach) {
+        // Fix timezone issue for date comparison
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        const dateStr = `${year}-${month}-${day}`;
+        
+        const today = new Date();
+        const todayYear = today.getFullYear();
+        const todayMonth = String(today.getMonth() + 1).padStart(2, '0');
+        const todayDay = String(today.getDate()).padStart(2, '0');
+        const todayStr = `${todayYear}-${todayMonth}-${todayDay}`;
+        const currentTime = `${String(today.getHours()).padStart(2, '0')}:${String(today.getMinutes()).padStart(2, '0')}:00`;
+        
+        const { data: activeRes } = await supabase
+          .from("reservations")
+          .select("*")
+          .or(`player1_id.eq.${userId},player2_id.eq.${userId}`)
+          .gte('date', todayStr);
 
-      if (activeRes && hasActiveReservation(activeRes, todayStr, currentTime)) {
-        toast.error("Vous avez déjà une réservation active");
-        return;
+        if (activeRes && hasActiveReservation(activeRes, todayStr, currentTime)) {
+          toast.error("Vous avez déjà une réservation active");
+          return;
+        }
       }
     }
 
@@ -314,30 +331,36 @@ export const BookingModal = ({
       const player1Id = isAdmin ? selectedPlayer1 : userId;
       const player2Id = isAdmin ? selectedPlayer2 : selectedPartner;
 
-      // Check player 1
-      const { data: player1ActiveRes } = await supabase
-        .from("reservations")
-        .select("*")
-        .or(`player1_id.eq.${player1Id},player2_id.eq.${player1Id}`)
-        .gte('date', todayStr);
+      // Check player 1 (sauf si super_coach)
+      const player1IsSuperCoach = await isSuperCoach(player1Id);
+      if (!player1IsSuperCoach) {
+        const { data: player1ActiveRes } = await supabase
+          .from("reservations")
+          .select("*")
+          .or(`player1_id.eq.${player1Id},player2_id.eq.${player1Id}`)
+          .gte('date', todayStr);
 
-      if (player1ActiveRes && hasActiveReservation(player1ActiveRes, todayStr, currentTime)) {
-        toast.error(isAdmin ? "Le joueur 1 a déjà une réservation active" : "Vous avez déjà une réservation active");
-        setLoading(false);
-        return;
+        if (player1ActiveRes && hasActiveReservation(player1ActiveRes, todayStr, currentTime)) {
+          toast.error(isAdmin ? "Le joueur 1 a déjà une réservation active" : "Vous avez déjà une réservation active");
+          setLoading(false);
+          return;
+        }
       }
 
-      // Check player 2
-      const { data: player2ActiveRes } = await supabase
-        .from("reservations")
-        .select("*")
-        .or(`player1_id.eq.${player2Id},player2_id.eq.${player2Id}`)
-        .gte('date', todayStr);
+      // Check player 2 (sauf si super_coach)
+      const player2IsSuperCoach = await isSuperCoach(player2Id);
+      if (!player2IsSuperCoach) {
+        const { data: player2ActiveRes } = await supabase
+          .from("reservations")
+          .select("*")
+          .or(`player1_id.eq.${player2Id},player2_id.eq.${player2Id}`)
+          .gte('date', todayStr);
 
-      if (player2ActiveRes && hasActiveReservation(player2ActiveRes, todayStr, currentTime)) {
-        toast.error(isAdmin ? "Le joueur 2 a déjà une réservation active" : "Votre partenaire a déjà une réservation active");
-        setLoading(false);
-        return;
+        if (player2ActiveRes && hasActiveReservation(player2ActiveRes, todayStr, currentTime)) {
+          toast.error(isAdmin ? "Le joueur 2 a déjà une réservation active" : "Votre partenaire a déjà une réservation active");
+          setLoading(false);
+          return;
+        }
       }
 
       const reservationData = {
