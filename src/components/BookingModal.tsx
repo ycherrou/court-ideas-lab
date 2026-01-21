@@ -79,6 +79,22 @@ export const BookingModal = ({
     return !!data;
   };
 
+  // Helper function to count active reservations
+  const countActiveReservations = (reservations: any[], todayStr: string, currentTime: string): number => {
+    return reservations.filter((res) => {
+      if (res.date > todayStr) return true;
+      if (res.date === todayStr && res.start_time > currentTime) return true;
+      return false;
+    }).length;
+  };
+
+  // Helper function to get max reservations based on role
+  const getMaxReservations = async (playerId: string): Promise<number> => {
+    if (await isSuperCoach(playerId)) return 4;
+    if (await isCoach(playerId)) return 2;
+    return 1;
+  };
+
   // Empêcher l'ouverture si l'utilisateur est un coach
   useEffect(() => {
     if (open && currentUserIsCoach && !isAdmin) {
@@ -171,36 +187,28 @@ export const BookingModal = ({
     
     setSelectedDate(normalizedDate);
     
-    // Check for active reservation (pas pour les admins, super_coach, ou coach)
+    // Check for active reservation limits (pas pour les admins)
     if (!isAdmin) {
-      // Vérifier si l'utilisateur est un super_coach ou coach
-      const userIsSuperCoach = await isSuperCoach(userId);
-      const userIsCoach = await isCoach(userId);
+      const today = new Date();
+      const todayYear = today.getFullYear();
+      const todayMonth = String(today.getMonth() + 1).padStart(2, '0');
+      const todayDay = String(today.getDate()).padStart(2, '0');
+      const todayStr = `${todayYear}-${todayMonth}-${todayDay}`;
+      const currentTime = `${String(today.getHours()).padStart(2, '0')}:${String(today.getMinutes()).padStart(2, '0')}:00`;
       
-      if (!userIsSuperCoach && !userIsCoach) {
-        // Fix timezone issue for date comparison
-        const year = date.getFullYear();
-        const month = String(date.getMonth() + 1).padStart(2, '0');
-        const day = String(date.getDate()).padStart(2, '0');
-        const dateStr = `${year}-${month}-${day}`;
-        
-        const today = new Date();
-        const todayYear = today.getFullYear();
-        const todayMonth = String(today.getMonth() + 1).padStart(2, '0');
-        const todayDay = String(today.getDate()).padStart(2, '0');
-        const todayStr = `${todayYear}-${todayMonth}-${todayDay}`;
-        const currentTime = `${String(today.getHours()).padStart(2, '0')}:${String(today.getMinutes()).padStart(2, '0')}:00`;
-        
-        const { data: activeRes } = await supabase
-          .from("reservations")
-          .select("*")
-          .or(`player1_id.eq.${userId},player2_id.eq.${userId}`)
-          .gte('date', todayStr);
+      const maxReservations = await getMaxReservations(userId);
+      
+      const { data: activeRes } = await supabase
+        .from("reservations")
+        .select("*")
+        .or(`player1_id.eq.${userId},player2_id.eq.${userId}`)
+        .gte('date', todayStr);
 
-        if (activeRes && hasActiveReservation(activeRes, todayStr, currentTime)) {
-          toast.error("Vous avez déjà une réservation active");
-          return;
-        }
+      const activeCount = activeRes ? countActiveReservations(activeRes, todayStr, currentTime) : 0;
+      
+      if (activeCount >= maxReservations) {
+        toast.error(`Vous avez atteint la limite de ${maxReservations} réservation(s) active(s)`);
+        return;
       }
     }
 
@@ -344,38 +352,44 @@ export const BookingModal = ({
       const player1Id = isAdmin ? selectedPlayer1 : userId;
       const player2Id = isAdmin ? selectedPlayer2 : selectedPartner;
 
-      // Check player 1 (sauf si super_coach ou coach)
-      const player1IsSuperCoach = await isSuperCoach(player1Id);
-      const player1IsCoach = await isCoach(player1Id);
-      if (!player1IsSuperCoach && !player1IsCoach) {
-        const { data: player1ActiveRes } = await supabase
-          .from("reservations")
-          .select("*")
-          .or(`player1_id.eq.${player1Id},player2_id.eq.${player1Id}`)
-          .gte('date', todayStr);
+      // Check player 1 reservation limit
+      const player1MaxRes = await getMaxReservations(player1Id);
+      const { data: player1ActiveRes } = await supabase
+        .from("reservations")
+        .select("*")
+        .or(`player1_id.eq.${player1Id},player2_id.eq.${player1Id}`)
+        .gte('date', todayStr);
 
-        if (player1ActiveRes && hasActiveReservation(player1ActiveRes, todayStr, currentTime)) {
-          toast.error(isAdmin ? "Le joueur 1 a déjà une réservation active" : "Vous avez déjà une réservation active");
-          setLoading(false);
-          return;
-        }
+      const player1ActiveCount = player1ActiveRes ? countActiveReservations(player1ActiveRes, todayStr, currentTime) : 0;
+
+      if (player1ActiveCount >= player1MaxRes) {
+        const roleLabel = player1MaxRes === 4 ? "super coach" : player1MaxRes === 2 ? "coach" : "joueur";
+        toast.error(isAdmin 
+          ? `Le joueur 1 a atteint sa limite de ${player1MaxRes} réservation(s) (${roleLabel})`
+          : `Vous avez atteint la limite de ${player1MaxRes} réservation(s) active(s)`
+        );
+        setLoading(false);
+        return;
       }
 
-      // Check player 2 (sauf si super_coach ou coach)
-      const player2IsSuperCoach = await isSuperCoach(player2Id);
-      const player2IsCoach = await isCoach(player2Id);
-      if (!player2IsSuperCoach && !player2IsCoach) {
-        const { data: player2ActiveRes } = await supabase
-          .from("reservations")
-          .select("*")
-          .or(`player1_id.eq.${player2Id},player2_id.eq.${player2Id}`)
-          .gte('date', todayStr);
+      // Check player 2 reservation limit
+      const player2MaxRes = await getMaxReservations(player2Id);
+      const { data: player2ActiveRes } = await supabase
+        .from("reservations")
+        .select("*")
+        .or(`player1_id.eq.${player2Id},player2_id.eq.${player2Id}`)
+        .gte('date', todayStr);
 
-        if (player2ActiveRes && hasActiveReservation(player2ActiveRes, todayStr, currentTime)) {
-          toast.error(isAdmin ? "Le joueur 2 a déjà une réservation active" : "Votre partenaire a déjà une réservation active");
-          setLoading(false);
-          return;
-        }
+      const player2ActiveCount = player2ActiveRes ? countActiveReservations(player2ActiveRes, todayStr, currentTime) : 0;
+
+      if (player2ActiveCount >= player2MaxRes) {
+        const roleLabel = player2MaxRes === 4 ? "super coach" : player2MaxRes === 2 ? "coach" : "joueur";
+        toast.error(isAdmin 
+          ? `Le joueur 2 a atteint sa limite de ${player2MaxRes} réservation(s) (${roleLabel})`
+          : `Votre partenaire a atteint sa limite de ${player2MaxRes} réservation(s)`
+        );
+        setLoading(false);
+        return;
       }
 
       const reservationData = {
