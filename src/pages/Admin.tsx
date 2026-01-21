@@ -92,10 +92,30 @@ const Admin = () => {
       // Charger les membres avec leurs rôles séparément
       if (membersData.data) {
         const memberIds = membersData.data.map(m => m.id);
-        const { data: roles } = await supabase
-          .from("user_roles")
-          .select("user_id, role")
-          .in("user_id", memberIds);
+        // IMPORTANT: chunk the IN query to avoid URL-length limits when there are many users.
+        const chunkArray = <T,>(arr: T[], size: number) => {
+          const chunks: T[][] = [];
+          for (let i = 0; i < arr.length; i += size) chunks.push(arr.slice(i, i + size));
+          return chunks;
+        };
+
+        const idChunks = chunkArray(memberIds, 200);
+        const roleResponses = await Promise.all(
+          idChunks.map((ids) =>
+            supabase
+              .from("user_roles")
+              .select("user_id, role")
+              .in("user_id", ids)
+          )
+        );
+
+        const firstError = roleResponses.find((r) => r.error)?.error;
+        if (firstError) {
+          console.error("Error fetching roles:", firstError);
+          toast.error("Erreur lors du chargement des rôles");
+        }
+
+        const roles = roleResponses.flatMap((r) => r.data ?? []);
 
         const membersWithRoles = membersData.data.map(member => ({
           ...member,
