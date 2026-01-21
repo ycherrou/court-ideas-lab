@@ -12,9 +12,17 @@ export const useAuth = () => {
 
   useEffect(() => {
     // D'abord, vérifier la session existante
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
+    supabase.auth.getSession().then(({ data: { session }, error }) => {
+      if (error) {
+        // Token invalide ou expiré - nettoyer proprement
+        console.error("Session invalide, nettoyage...", error);
+        supabase.auth.signOut();
+        setSession(null);
+        setUser(null);
+      } else {
+        setSession(session);
+        setUser(session?.user ?? null);
+      }
       initialSessionChecked.current = true;
       setLoading(false);
     });

@@ -76,7 +76,9 @@ const Auth = () => {
       if (error instanceof z.ZodError) {
         toast.error(error.errors[0].message);
       } else if (error instanceof Error) {
-        toast.error(error.message);
+        toast.error(error.message, {
+          description: "Vérifiez votre identifiant (nom + prénom sans espace) et votre code PIN"
+        });
       }
     } finally {
       setLoading(false);
@@ -101,9 +103,12 @@ const Auth = () => {
                 id="username"
                 name="username"
                 type="text"
-                placeholder="jdupont"
+                placeholder="dupontjean"
                 required
               />
+              <p className="text-xs text-muted-foreground">
+                Format : nom + prénom, sans espace (ex: dupontjean)
+              </p>
             </div>
             <div className="space-y-2">
               <Label htmlFor="password">Code PIN ou mot de passe</Label>
