@@ -13,10 +13,11 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
-import { ArrowLeft, UserPlus, Trash2, Calendar, Ban, Edit, Search, Upload, Eye, EyeOff, KeyRound } from "lucide-react";
+import { ArrowLeft, UserPlus, Trash2, Calendar, Ban, Edit, Search, Upload, Eye, EyeOff, KeyRound, History } from "lucide-react";
 import { BulkImportModal } from "@/components/BulkImportModal";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Skeleton } from "@/components/ui/skeleton";
+import { AuditLogViewer } from "@/components/AuditLogViewer";
 import { z } from "zod";
 
 const newMemberSchema = z.object({
@@ -41,6 +42,32 @@ const Admin = () => {
   const [bulkImportOpen, setBulkImportOpen] = useState(false);
   const [showPins, setShowPins] = useState<Set<string>>(new Set());
   const [selectedCourts, setSelectedCourts] = useState<string[]>([]);
+  const [userProfile, setUserProfile] = useState<{ full_name: string } | null>(null);
+
+  // Helper pour logger les actions d'audit
+  const logAuditAction = async (
+    actionType: "CREATE" | "UPDATE" | "DELETE",
+    entityType: "RESERVATION" | "MEMBER" | "ROLE" | "BLOCKED_SLOT" | "PASSWORD" | "BULK_IMPORT",
+    entityId: string | null,
+    oldValues: Record<string, any> | null,
+    newValues: Record<string, any> | null,
+    description: string
+  ) => {
+    try {
+      await supabase.rpc("log_action", {
+        _performed_by: user?.id || null,
+        _performer_name: userProfile?.full_name || "Inconnu",
+        _action_type: actionType,
+        _entity_type: entityType,
+        _entity_id: entityId,
+        _old_values: oldValues,
+        _new_values: newValues,
+        _description: description,
+      });
+    } catch (err) {
+      console.error("Erreur audit log:", err);
+    }
+  };
 
   useEffect(() => {
     // Attendre que l'auth ET le rôle soient résolus avant de rediriger
@@ -60,8 +87,19 @@ const Admin = () => {
   useEffect(() => {
     if (isAdmin) {
       fetchData();
+      // Charger le profil de l'utilisateur actuel pour l'audit
+      if (user?.id) {
+        supabase
+          .from("profiles")
+          .select("full_name")
+          .eq("id", user.id)
+          .single()
+          .then(({ data }) => {
+            if (data) setUserProfile(data);
+          });
+      }
     }
-  }, [isAdmin]);
+  }, [isAdmin, user?.id]);
 
   const fetchData = async () => {
     try {
@@ -151,22 +189,53 @@ const Admin = () => {
   const handleDeleteReservation = async (id: string) => {
     if (!confirm("Êtes-vous sûr de vouloir annuler cette réservation ?")) return;
 
+    // Récupérer les infos avant suppression pour l'audit
+    const reservation = reservations.find((r) => r.id === id);
+
     const { error } = await supabase.from("reservations").delete().eq("id", id);
 
     if (error) {
       toast.error("Erreur lors de l'annulation");
     } else {
+      // Logger l'action
+      await logAuditAction(
+        "DELETE",
+        "RESERVATION",
+        id,
+        {
+          date: reservation?.date,
+          court: reservation?.court?.name,
+          start_time: reservation?.start_time,
+          end_time: reservation?.end_time,
+          player1: reservation?.player1?.full_name,
+          player2: reservation?.player2?.full_name,
+        },
+        null,
+        `Annulation réservation: ${reservation?.player1?.full_name} vs ${reservation?.player2?.full_name} le ${reservation?.date}`
+      );
+
       toast.success("Réservation annulée");
       fetchData();
     }
   };
 
   const handleDeleteBlockedSlot = async (id: string) => {
+    // Récupérer les infos avant suppression
+    const slot = blockedSlots.find((s) => s.id === id);
+
     const { error } = await supabase.from("blocked_slots").delete().eq("id", id);
 
     if (error) {
       toast.error("Erreur lors de la suppression");
     } else {
+      await logAuditAction(
+        "DELETE",
+        "BLOCKED_SLOT",
+        id,
+        { date: slot?.date, court: slot?.court?.name, reason: slot?.reason, start_time: slot?.start_time, end_time: slot?.end_time },
+        null,
+        `Suppression blocage: ${slot?.court?.name} le ${slot?.date}`
+      );
       toast.success("Blocage supprimé");
       fetchData();
     }
@@ -232,6 +301,11 @@ const Admin = () => {
       email: formData.get("email") as string,
     };
 
+    const oldProfileData = {
+      full_name: selectedMember.full_name,
+      email: selectedMember.email,
+    };
+
     const { error: profileError } = await supabase
       .from("profiles")
       .update(data)
@@ -273,7 +347,27 @@ const Admin = () => {
         toast.error("Erreur lors de la modification du rôle");
         return;
       }
+
+      // Logger le changement de rôle
+      await logAuditAction(
+        "UPDATE",
+        "ROLE",
+        selectedMember.id,
+        { role: currentRole },
+        { role: newRole },
+        `Changement rôle: ${selectedMember.full_name} (${currentRole} → ${newRole})`
+      );
     }
+
+    // Logger la modification du profil
+    await logAuditAction(
+      "UPDATE",
+      "MEMBER",
+      selectedMember.id,
+      oldProfileData,
+      data,
+      `Modification profil: ${selectedMember.full_name}`
+    );
 
     toast.success("Membre modifié avec succès");
     setEditMemberOpen(false);
@@ -399,6 +493,16 @@ const Admin = () => {
 
       if (error) throw error;
 
+      // Logger l'action
+      await logAuditAction(
+        "UPDATE",
+        "PASSWORD",
+        memberId,
+        null,
+        { pin_reset: true },
+        `Réinitialisation PIN: ${memberName}`
+      );
+
       // Afficher automatiquement le PIN après réinitialisation
       setShowPins(prev => new Set([...prev, memberId]));
       
@@ -445,11 +549,24 @@ const Admin = () => {
       court_id: courtId,
     }));
 
-    const { error } = await supabase.from("blocked_slots").insert(blocksToInsert);
+    const { error, data: insertedData } = await supabase.from("blocked_slots").insert(blocksToInsert).select();
 
     if (error) {
       toast.error("Erreur lors de la création");
     } else {
+      // Logger la création des blocages
+      for (const courtId of selectedCourts) {
+        const court = courts.find((c) => c.id === courtId);
+        await logAuditAction(
+          "CREATE",
+          "BLOCKED_SLOT",
+          insertedData?.[0]?.id || null,
+          null,
+          { date: baseData.date, court: court?.name, reason: baseData.reason, start_time: baseData.start_time, end_time: baseData.end_time },
+          `Création blocage: ${court?.name} le ${baseData.date}`
+        );
+      }
+
       toast.success(`${selectedCourts.length} terrain(s) bloqué(s) avec succès`);
       setSelectedCourts([]);
       fetchData();
@@ -488,10 +605,14 @@ const Admin = () => {
 
         <main className="container mx-auto px-4 py-8">
           <Tabs defaultValue="members">
-            <TabsList className="grid w-full grid-cols-3 max-w-md">
+            <TabsList className="grid w-full grid-cols-4 max-w-lg">
               <TabsTrigger value="members">Membres</TabsTrigger>
               <TabsTrigger value="reservations">Réservations</TabsTrigger>
               <TabsTrigger value="blocked">Blocages</TabsTrigger>
+              <TabsTrigger value="history">
+                <History className="h-4 w-4 mr-1" />
+                Historique
+              </TabsTrigger>
             </TabsList>
 
           <TabsContent value="members" className="mt-6">
@@ -900,6 +1021,10 @@ const Admin = () => {
           </Card>
         </div>
       </TabsContent>
+
+          <TabsContent value="history" className="mt-6">
+            <AuditLogViewer />
+          </TabsContent>
           </Tabs>
         </main>
       </div>

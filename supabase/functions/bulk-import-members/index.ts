@@ -163,6 +163,13 @@ Deno.serve(async (req) => {
 
     console.log(`Found ${existingNormalizedNames.size} existing members in database`);
 
+    // Récupérer le nom de l'admin pour l'audit
+    const { data: adminProfile } = await supabaseAdmin
+      .from('profiles')
+      .select('full_name')
+      .eq('id', user.id)
+      .single();
+
     const validRoles = ['player', 'admin', 'coach', 'super_coach'];
     const results: Array<{login: string, pin: string, fullName: string, email: string, role: string}> = [];
     const skipped: Array<{fullName: string, email: string, reason: string}> = [];
@@ -268,6 +275,22 @@ Deno.serve(async (req) => {
               user_id: userData.user.id,
               role: assignedRole
             });
+
+          // Logger la création pour l'audit
+          try {
+            await supabaseAdmin.rpc('log_action', {
+              _performed_by: user.id,
+              _performer_name: adminProfile?.full_name || 'Admin',
+              _action_type: 'CREATE',
+              _entity_type: 'BULK_IMPORT',
+              _entity_id: userData.user.id,
+              _old_values: null,
+              _new_values: { full_name: fullName, role: assignedRole, login },
+              _description: `Import en masse: ${fullName} (${assignedRole})`
+            });
+          } catch (auditError) {
+            console.error('Error logging audit:', auditError);
+          }
 
           return {
             type: 'success',

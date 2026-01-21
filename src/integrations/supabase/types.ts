@@ -14,6 +14,45 @@ export type Database = {
   }
   public: {
     Tables: {
+      audit_logs: {
+        Row: {
+          action_type: string
+          description: string | null
+          entity_id: string | null
+          entity_type: string
+          id: string
+          new_values: Json | null
+          old_values: Json | null
+          performed_at: string
+          performed_by: string | null
+          performer_name: string
+        }
+        Insert: {
+          action_type: string
+          description?: string | null
+          entity_id?: string | null
+          entity_type: string
+          id?: string
+          new_values?: Json | null
+          old_values?: Json | null
+          performed_at?: string
+          performed_by?: string | null
+          performer_name: string
+        }
+        Update: {
+          action_type?: string
+          description?: string | null
+          entity_id?: string | null
+          entity_type?: string
+          id?: string
+          new_values?: Json | null
+          old_values?: Json | null
+          performed_at?: string
+          performed_by?: string | null
+          performer_name?: string
+        }
+        Relationships: []
+      }
       blocked_slots: {
         Row: {
           court_id: string | null
@@ -221,6 +260,19 @@ export type Database = {
       is_court_allowed_for_user: {
         Args: { _court_id: string; _user_id: string }
         Returns: boolean
+      }
+      log_action: {
+        Args: {
+          _action_type: string
+          _description?: string
+          _entity_id?: string
+          _entity_type: string
+          _new_values?: Json
+          _old_values?: Json
+          _performed_by: string
+          _performer_name: string
+        }
+        Returns: undefined
       }
     }
     Enums: {
