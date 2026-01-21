@@ -2,6 +2,9 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { corsHeaders } from "../_shared/cors.ts";
 
 Deno.serve(async (req) => {
+  console.log("=== update-member function called ===");
+  console.log("Method:", req.method);
+  
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
@@ -11,7 +14,10 @@ Deno.serve(async (req) => {
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 
     const authHeader = req.headers.get("Authorization");
+    console.log("Auth header present:", !!authHeader);
+    
     if (!authHeader) {
+      console.error("No auth header provided");
       return new Response(JSON.stringify({ error: "Non autorisé" }), {
         status: 401,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -24,12 +30,17 @@ Deno.serve(async (req) => {
     });
 
     const token = authHeader.replace("Bearer ", "");
+    console.log("Token length:", token.length);
+    
     const {
       data: { user },
       error: userError,
     } = await supabaseAdmin.auth.getUser(token);
 
+    console.log("getUser result - user:", user?.id, "error:", userError?.message);
+
     if (userError || !user) {
+      console.error("Auth failed:", userError?.message || "No user");
       return new Response(JSON.stringify({ error: "Non autorisé" }), {
         status: 401,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
