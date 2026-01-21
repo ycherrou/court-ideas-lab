@@ -30,7 +30,8 @@ Deno.serve(async (req) => {
     }
 
     console.log(`Tentative de connexion - username reçu: "${username}" (longueur: ${username.length})`);
-    const normalizedUsername = username.toLowerCase().trim();
+    // Supprimer TOUS les espaces (internes, début, fin) et mettre en minuscules
+    const normalizedUsername = username.toLowerCase().replace(/\s+/g, '');
     console.log(`Username normalisé: "${normalizedUsername}" (longueur: ${normalizedUsername.length})`);
 
     // Utiliser le client admin pour chercher le profil (pas soumis aux RLS)
