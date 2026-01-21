@@ -301,94 +301,78 @@ const Admin = () => {
       email: formData.get("email") as string,
     };
 
+    const newRole = formData.get("role") as string;
+    const currentRole = selectedMember.user_roles?.[0]?.role || "player";
+
     const oldProfileData = {
       full_name: selectedMember.full_name,
       email: selectedMember.email,
     };
 
-    const { error: profileError } = await supabase
-      .from("profiles")
-      .update(data)
-      .eq("id", selectedMember.id);
+    try {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      if (!session) throw new Error("Non connecté");
 
-    if (profileError) {
-      toast.error("Erreur lors de la modification");
-      return;
-    }
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/update-member`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${session.access_token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            userId: selectedMember.id,
+            fullName: data.full_name,
+            email: data.email,
+            role: newRole,
+          }),
+        },
+      );
 
-    const newRole = formData.get("role") as string;
-    const currentRole = selectedMember.user_roles?.[0]?.role || "player";
-
-    if (newRole !== currentRole) {
-      // Supprimer l'ancien rôle AVEC vérification d'erreur
-      const { error: deleteError } = await supabase
-        .from("user_roles")
-        .delete()
-        .eq("user_id", selectedMember.id);
-      
-      if (deleteError) {
-        console.error("Erreur suppression rôle:", deleteError);
-        toast.error("Erreur lors de la modification du rôle");
-        return;
-      }
-      
-      // Ajouter le nouveau rôle
-      const { error: roleError } = await supabase
-        .from("user_roles")
-        .insert([{ user_id: selectedMember.id, role: newRole as "admin" | "coach" | "player" | "super_coach" }]);
-
-      if (roleError) {
-        console.error("Erreur insertion nouveau rôle:", roleError);
-        // Tenter de restaurer l'ancien rôle pour éviter un état incohérent
-        await supabase
-          .from("user_roles")
-          .insert([{ user_id: selectedMember.id, role: currentRole as "admin" | "coach" | "player" | "super_coach" }]);
-        
-        toast.error("Erreur lors de la modification du rôle");
-        return;
+      const result = await response.json();
+      if (!response.ok) {
+        throw new Error(result.error || "Erreur lors de la modification");
       }
 
-      // Logger le changement de rôle
+      // Logger le changement de rôle (si applicable)
+      if (newRole !== currentRole) {
+        await logAuditAction(
+          "UPDATE",
+          "ROLE",
+          selectedMember.id,
+          { role: currentRole },
+          { role: newRole },
+          `Changement rôle: ${selectedMember.full_name} (${currentRole} → ${newRole})`,
+        );
+      }
+
+      // Logger la modification du profil
       await logAuditAction(
         "UPDATE",
-        "ROLE",
+        "MEMBER",
         selectedMember.id,
-        { role: currentRole },
-        { role: newRole },
-        `Changement rôle: ${selectedMember.full_name} (${currentRole} → ${newRole})`
+        oldProfileData,
+        data,
+        `Modification profil: ${selectedMember.full_name}`,
       );
+
+      // Mise à jour locale immédiate + évite retour au nom précédent
+      setMembers((prevMembers) =>
+        prevMembers.map((member) =>
+          member.id === selectedMember.id ? { ...member, ...result.member } : member,
+        ),
+      );
+
+      toast.success("Membre modifié avec succès");
+      setEditMemberOpen(false);
+      setSelectedMember(null);
+      fetchData();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Erreur lors de la modification");
     }
-
-    // Logger la modification du profil
-    await logAuditAction(
-      "UPDATE",
-      "MEMBER",
-      selectedMember.id,
-      oldProfileData,
-      data,
-      `Modification profil: ${selectedMember.full_name}`
-    );
-
-    // Mise à jour locale immédiate pour éviter le délai de rafraîchissement
-    setMembers(prevMembers =>
-      prevMembers.map(member =>
-        member.id === selectedMember.id
-          ? {
-              ...member,
-              full_name: data.full_name,
-              email: data.email,
-              user_roles: newRole !== currentRole 
-                ? [{ role: newRole as "admin" | "coach" | "player" | "super_coach" }] 
-                : member.user_roles
-            }
-          : member
-      )
-    );
-
-    toast.success("Membre modifié avec succès");
-    setEditMemberOpen(false);
-    setSelectedMember(null);
-    fetchData(); // Synchronisation en arrière-plan
   };
 
   const handleDeleteMember = async (memberId: string) => {
