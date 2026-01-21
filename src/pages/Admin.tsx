@@ -369,10 +369,26 @@ const Admin = () => {
       `Modification profil: ${selectedMember.full_name}`
     );
 
+    // Mise à jour locale immédiate pour éviter le délai de rafraîchissement
+    setMembers(prevMembers =>
+      prevMembers.map(member =>
+        member.id === selectedMember.id
+          ? {
+              ...member,
+              full_name: data.full_name,
+              email: data.email,
+              user_roles: newRole !== currentRole 
+                ? [{ role: newRole as "admin" | "coach" | "player" | "super_coach" }] 
+                : member.user_roles
+            }
+          : member
+      )
+    );
+
     toast.success("Membre modifié avec succès");
     setEditMemberOpen(false);
     setSelectedMember(null);
-    fetchData();
+    fetchData(); // Synchronisation en arrière-plan
   };
 
   const handleDeleteMember = async (memberId: string) => {
