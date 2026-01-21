@@ -2,9 +2,6 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { corsHeaders } from "../_shared/cors.ts";
 
 Deno.serve(async (req) => {
-  console.log("=== reset-member-pin function called ===");
-  console.log("Method:", req.method);
-  
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
@@ -18,27 +15,15 @@ Deno.serve(async (req) => {
     });
 
     const authHeader = req.headers.get("Authorization");
-    console.log("Auth header present:", !!authHeader);
-    
-    if (!authHeader) {
-      console.error("No auth header provided");
-      throw new Error("Non autorisé");
-    }
+    if (!authHeader) throw new Error("Non autorisé");
 
     const token = authHeader.replace("Bearer ", "");
-    console.log("Token length:", token.length);
-    
     const {
       data: { user },
       error: userError,
     } = await supabaseAdmin.auth.getUser(token);
 
-    console.log("getUser result - user:", user?.id, "error:", userError?.message);
-
-    if (userError || !user) {
-      console.error("Auth failed:", userError?.message || "No user");
-      throw new Error("Non autorisé");
-    }
+    if (userError || !user) throw new Error("Non autorisé");
 
     // Vérifier que l'utilisateur est admin
     const { data: roles } = await supabaseAdmin
