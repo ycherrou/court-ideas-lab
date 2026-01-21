@@ -9,6 +9,9 @@ verify_jwt = true
 [functions.bulk-import-members]
 verify_jwt = true
 
+[functions.reset-member-pin]
+verify_jwt = true
+
 [functions.login-with-username]
 verify_jwt = false
 
