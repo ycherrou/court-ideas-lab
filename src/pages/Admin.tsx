@@ -226,8 +226,17 @@ const Admin = () => {
     const currentRole = selectedMember.user_roles?.[0]?.role || "player";
 
     if (newRole !== currentRole) {
-      // Supprimer l'ancien rôle
-      await supabase.from("user_roles").delete().eq("user_id", selectedMember.id);
+      // Supprimer l'ancien rôle AVEC vérification d'erreur
+      const { error: deleteError } = await supabase
+        .from("user_roles")
+        .delete()
+        .eq("user_id", selectedMember.id);
+      
+      if (deleteError) {
+        console.error("Erreur suppression rôle:", deleteError);
+        toast.error("Erreur lors de la modification du rôle");
+        return;
+      }
       
       // Ajouter le nouveau rôle
       const { error: roleError } = await supabase
@@ -235,6 +244,12 @@ const Admin = () => {
         .insert([{ user_id: selectedMember.id, role: newRole as "admin" | "coach" | "player" | "super_coach" }]);
 
       if (roleError) {
+        console.error("Erreur insertion nouveau rôle:", roleError);
+        // Tenter de restaurer l'ancien rôle pour éviter un état incohérent
+        await supabase
+          .from("user_roles")
+          .insert([{ user_id: selectedMember.id, role: currentRole as "admin" | "coach" | "player" | "super_coach" }]);
+        
         toast.error("Erreur lors de la modification du rôle");
         return;
       }
