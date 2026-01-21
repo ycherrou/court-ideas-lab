@@ -9,7 +9,6 @@ Deno.serve(async (req) => {
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
-    const anonKey = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
 
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
@@ -19,9 +18,8 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Client with caller token (for role verification)
-    const supabaseCaller = createClient(supabaseUrl, anonKey, {
-      global: { headers: { Authorization: authHeader } },
+    // Admin client (bypasses RLS)
+    const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey, {
       auth: { autoRefreshToken: false, persistSession: false },
     });
 
@@ -29,7 +27,7 @@ Deno.serve(async (req) => {
     const {
       data: { user },
       error: userError,
-    } = await supabaseCaller.auth.getUser(token);
+    } = await supabaseAdmin.auth.getUser(token);
 
     if (userError || !user) {
       return new Response(JSON.stringify({ error: "Non autorisé" }), {
@@ -39,7 +37,7 @@ Deno.serve(async (req) => {
     }
 
     // Verify admin
-    const { data: adminRole } = await supabaseCaller
+    const { data: adminRole } = await supabaseAdmin
       .from("user_roles")
       .select("role")
       .eq("user_id", user.id)
@@ -68,11 +66,6 @@ Deno.serve(async (req) => {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
-
-    // Admin client (bypasses RLS)
-    const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey, {
-      auth: { autoRefreshToken: false, persistSession: false },
-    });
 
     // Update profile
     if (typeof fullName === "string" || typeof email === "string") {
