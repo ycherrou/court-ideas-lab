@@ -623,9 +623,16 @@ const Admin = () => {
                           )}
                         </TableCell>
                         <TableCell>
-                          {member.user_roles?.[0]?.role || 'player'}
-                          {member.user_roles?.[0]?.role === 'coach' && ' 🎾'}
-                          {member.user_roles?.[0]?.role === 'super_coach' && ' ⭐🎾'}
+                          {(() => {
+                            const role = member.user_roles?.find((r: any) => r.role !== 'player')?.role || member.user_roles?.[0]?.role || 'player';
+                            return (
+                              <>
+                                {role}
+                                {role === 'coach' && ' 🎾'}
+                                {role === 'super_coach' && ' ⭐🎾'}
+                              </>
+                            );
+                          })()}
                         </TableCell>
                         <TableCell>
                           {new Date(member.created_at).toLocaleDateString("fr-FR")}
@@ -698,7 +705,7 @@ const Admin = () => {
                       <Label htmlFor="edit-role">Rôle</Label>
                       <Select
                         name="role"
-                        defaultValue={selectedMember.user_roles?.[0]?.role || "player"}
+                        defaultValue={selectedMember.user_roles?.find((r: any) => r.role !== 'player')?.role || selectedMember.user_roles?.[0]?.role || "player"}
                       >
                         <SelectTrigger>
                           <SelectValue />
