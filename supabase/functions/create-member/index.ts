@@ -125,18 +125,18 @@ Deno.serve(async (req) => {
         console.error('Error updating profile:', profileError)
       }
 
-      // Assigner le rôle si spécifié
-      if (role) {
-        const { error: roleError } = await supabaseAdmin
-          .from('user_roles')
-          .insert({
-            user_id: data.user.id,
-            role: role
-          })
+      // Toujours assigner un rôle (par défaut 'player' si non spécifié)
+      const roleToAssign = role || 'player'
+      
+      const { error: roleError } = await supabaseAdmin
+        .from('user_roles')
+        .insert({
+          user_id: data.user.id,
+          role: roleToAssign
+        })
 
-        if (roleError) {
-          console.error('Error assigning role:', roleError)
-        }
+      if (roleError) {
+        console.error('Error assigning role:', roleError)
       }
     }
 
