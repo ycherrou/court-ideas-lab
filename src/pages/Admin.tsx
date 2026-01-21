@@ -13,7 +13,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
-import { ArrowLeft, UserPlus, Trash2, Calendar, Ban, Edit, Search, Upload, Eye, EyeOff, KeyRound, History } from "lucide-react";
+import { ArrowLeft, UserPlus, Trash2, Calendar, Ban, Edit, Search, Upload, Eye, EyeOff, KeyRound, History, X } from "lucide-react";
 import { BulkImportModal } from "@/components/BulkImportModal";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -43,6 +43,11 @@ const Admin = () => {
   const [showPins, setShowPins] = useState<Set<string>>(new Set());
   const [selectedCourts, setSelectedCourts] = useState<string[]>([]);
   const [userProfile, setUserProfile] = useState<{ full_name: string } | null>(null);
+  
+  // Filtres réservations
+  const [reservationSearchQuery, setReservationSearchQuery] = useState("");
+  const [reservationDateFilter, setReservationDateFilter] = useState("");
+  const [reservationCourtFilter, setReservationCourtFilter] = useState("");
 
   // Helper pour logger les actions d'audit
   const logAuditAction = async (
@@ -598,6 +603,31 @@ const Admin = () => {
     return fullName.includes(searchQuery.toLowerCase());
   });
 
+  const filteredReservations = reservations.filter((res) => {
+    // Filtre par nom de joueur
+    const playerNames = `${res.player1?.full_name || ""} ${res.player2?.full_name || ""}`.toLowerCase();
+    const matchesSearch = reservationSearchQuery === "" || 
+      playerNames.includes(reservationSearchQuery.toLowerCase());
+    
+    // Filtre par date
+    const matchesDate = reservationDateFilter === "" || 
+      res.date === reservationDateFilter;
+    
+    // Filtre par terrain
+    const matchesCourt = reservationCourtFilter === "" || 
+      res.court_id === reservationCourtFilter;
+    
+    return matchesSearch && matchesDate && matchesCourt;
+  });
+
+  const hasReservationFilters = reservationSearchQuery || reservationDateFilter || reservationCourtFilter;
+
+  const clearReservationFilters = () => {
+    setReservationSearchQuery("");
+    setReservationDateFilter("");
+    setReservationCourtFilter("");
+  };
+
   if (authLoading || roleLoading || loading) {
     return (
       <div className="min-h-screen p-8">
@@ -890,10 +920,69 @@ const Admin = () => {
           <TabsContent value="reservations" className="mt-6">
             <Card>
               <CardHeader>
-                <CardTitle>Réservations à venir</CardTitle>
-                <CardDescription>{reservations.length} réservation{reservations.length > 1 ? "s" : ""}</CardDescription>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle>Réservations à venir</CardTitle>
+                    <CardDescription>
+                      {filteredReservations.length} réservation{filteredReservations.length > 1 ? "s" : ""}
+                      {hasReservationFilters && ` (${reservations.length} total)`}
+                    </CardDescription>
+                  </div>
+                  {hasReservationFilters && (
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={clearReservationFilters}
+                    >
+                      <X className="h-4 w-4 mr-2" />
+                      Effacer les filtres
+                    </Button>
+                  )}
+                </div>
               </CardHeader>
               <CardContent>
+                {/* Barre de recherche et filtres */}
+                <div className="mb-4 grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {/* Recherche par nom */}
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Rechercher par joueur..."
+                      value={reservationSearchQuery}
+                      onChange={(e) => setReservationSearchQuery(e.target.value)}
+                      className="pl-10"
+                    />
+                  </div>
+                  
+                  {/* Filtre par date */}
+                  <div>
+                    <Input
+                      type="date"
+                      value={reservationDateFilter}
+                      onChange={(e) => setReservationDateFilter(e.target.value)}
+                      className="w-full"
+                    />
+                  </div>
+                  
+                  {/* Filtre par terrain */}
+                  <Select 
+                    value={reservationCourtFilter} 
+                    onValueChange={setReservationCourtFilter}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Tous les terrains" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Tous les terrains</SelectItem>
+                      {courts.map((court) => (
+                        <SelectItem key={court.id} value={court.id}>
+                          {court.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -905,29 +994,37 @@ const Admin = () => {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {reservations.map((res) => (
-                      <TableRow key={res.id}>
-                        <TableCell>
-                          {new Date(res.date).toLocaleDateString("fr-FR")}
-                        </TableCell>
-                        <TableCell>
-                          {res.start_time.slice(0, 5)} - {res.end_time.slice(0, 5)}
-                        </TableCell>
-                        <TableCell>{res.court?.name}</TableCell>
-                        <TableCell>
-                          {res.player1?.full_name} & {res.player2?.full_name}
-                        </TableCell>
-                        <TableCell>
-                          <Button
-                            variant="destructive"
-                            size="sm"
-                            onClick={() => handleDeleteReservation(res.id)}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
+                    {filteredReservations.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+                          {hasReservationFilters ? "Aucune réservation ne correspond aux filtres" : "Aucune réservation à venir"}
                         </TableCell>
                       </TableRow>
-                    ))}
+                    ) : (
+                      filteredReservations.map((res) => (
+                        <TableRow key={res.id}>
+                          <TableCell>
+                            {new Date(res.date).toLocaleDateString("fr-FR")}
+                          </TableCell>
+                          <TableCell>
+                            {res.start_time.slice(0, 5)} - {res.end_time.slice(0, 5)}
+                          </TableCell>
+                          <TableCell>{res.court?.name}</TableCell>
+                          <TableCell>
+                            {res.player1?.full_name} & {res.player2?.full_name}
+                          </TableCell>
+                          <TableCell>
+                            <Button
+                              variant="destructive"
+                              size="sm"
+                              onClick={() => handleDeleteReservation(res.id)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
                   </TableBody>
                 </Table>
               </CardContent>
