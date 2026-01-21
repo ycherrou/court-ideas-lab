@@ -480,18 +480,29 @@ const Admin = () => {
     if (!confirm(`Réinitialiser le PIN de ${memberName} ?`)) return;
 
     try {
-      // Générer un nouveau PIN à 4 chiffres
-      const newPin = Math.floor(1000 + Math.random() * 9000).toString();
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error("Non connecté");
 
-      const { error } = await supabase
-        .from("profiles")
-        .update({ 
-          temporary_pin: newPin,
-          must_change_password: true 
-        })
-        .eq("id", memberId);
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/reset-member-pin`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${session.access_token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ userId: memberId }),
+        }
+      );
 
-      if (error) throw error;
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || "Erreur lors de la réinitialisation");
+      }
+
+      const newPin: string | undefined = result?.pin;
+      if (!newPin) throw new Error("PIN manquant dans la réponse");
 
       // Logger l'action
       await logAuditAction(
@@ -516,11 +527,8 @@ const Admin = () => {
       setShowPins(prev => new Set([...prev, memberId]));
       
       toast.success(`PIN réinitialisé pour ${memberName}\nNouveau PIN: ${newPin}`, { duration: 10000 });
-      
-      // Rafraîchir en arrière-plan pour synchroniser
-      fetchData();
     } catch (error) {
-      toast.error("Erreur lors de la réinitialisation du PIN");
+      toast.error(error instanceof Error ? error.message : "Erreur lors de la réinitialisation du PIN");
     }
   };
 
