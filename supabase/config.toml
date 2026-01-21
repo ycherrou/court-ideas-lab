@@ -10,10 +10,10 @@ verify_jwt = true
 verify_jwt = true
 
 [functions.reset-member-pin]
-verify_jwt = true
+verify_jwt = false
 
 [functions.update-member]
-verify_jwt = true
+verify_jwt = false
 
 [functions.login-with-username]
 verify_jwt = false
