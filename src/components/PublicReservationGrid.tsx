@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -150,17 +150,17 @@ export const PublicReservationGrid = ({ date }: { date: Date }) => {
     date.getDate() === today.getDate();
 
   return (
-    <div className="w-full h-full flex flex-col">
+    <div className="w-full h-full flex flex-col overflow-hidden">
       {/* Grid container */}
       <div 
-        className="flex-1 grid"
+        className="flex-1 grid min-w-0"
         style={{
-          gridTemplateColumns: `130px repeat(${allHours.length}, 1fr)`,
-          gridTemplateRows: `40px repeat(${courts.length}, 1fr)`,
+          gridTemplateColumns: `100px repeat(${allHours.length}, minmax(0, 1fr))`,
+          gridTemplateRows: `36px repeat(${courts.length}, 1fr)`,
         }}
       >
         {/* Header: Corner */}
-        <div className="bg-primary text-primary-foreground font-bold text-sm flex items-center justify-center border border-border">
+        <div className="bg-primary text-primary-foreground font-bold text-xs flex items-center justify-center border border-border">
           Terrain
         </div>
         
@@ -170,31 +170,30 @@ export const PublicReservationGrid = ({ date }: { date: Date }) => {
           return (
             <div
               key={hour}
-              className={`font-bold text-sm flex items-center justify-center border border-border ${
+              className={`font-bold text-xs flex items-center justify-center border border-border ${
                 isCurrentHour
                   ? 'bg-primary text-primary-foreground'
                   : 'bg-muted text-muted-foreground'
               }`}
             >
               {hour}h
-              {isCurrentHour && <span className="ml-1 animate-pulse">●</span>}
+              {isCurrentHour && <span className="ml-0.5 animate-pulse text-[10px]">●</span>}
             </div>
           );
         })}
 
         {/* Rows: Courts and slots */}
         {courts.map((court) => (
-          <>
+          <React.Fragment key={court.id}>
             {/* Court name */}
             <div
-              key={`court-${court.id}`}
-              className="bg-secondary text-secondary-foreground font-bold text-sm flex items-center gap-2 px-2 border border-border"
+              className="bg-secondary text-secondary-foreground font-bold text-xs flex items-center gap-1 px-1 border border-border"
             >
-              <span className="w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-bold shrink-0">
+              <span className="w-5 h-5 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-[10px] font-bold shrink-0">
                 {court.court_number}
               </span>
-              <span className="truncate text-xs">
-                {court.court_number === 10 ? 'Central' : `Terrain ${court.court_number}`}
+              <span className="truncate text-[11px]">
+                {court.court_number === 10 ? 'Central' : `T${court.court_number}`}
               </span>
             </div>
             
@@ -212,7 +211,7 @@ export const PublicReservationGrid = ({ date }: { date: Date }) => {
                 </div>
               );
             })}
-          </>
+          </React.Fragment>
         ))}
       </div>
 
