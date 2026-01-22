@@ -457,12 +457,12 @@ export const BookingModal = ({
               disabled={(date) => {
                 const today = new Date();
                 today.setHours(0, 0, 0, 0);
-                return date < today || date > addDays(new Date(), 7);
+                return date < today;
               }}
               className="pointer-events-auto rounded-md border p-3"
             />
             <p className="text-sm text-muted-foreground text-center px-4">
-              Sélectionnez une date dans les 7 prochains jours
+              Sélectionnez une date
             </p>
           </div>
         )}

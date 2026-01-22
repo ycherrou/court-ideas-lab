@@ -8,10 +8,11 @@ import { BookingModal } from "@/components/BookingModal";
 import { ChangePasswordDialog } from "@/components/ChangePasswordDialog";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Calendar, LogOut, Settings, ChevronLeft, ChevronRight, KeyRound } from "lucide-react";
+import { Calendar as CalendarIcon, LogOut, Settings, ChevronLeft, ChevronRight, KeyRound } from "lucide-react";
 import { MobileNav } from "@/components/MobileNav";
-import { Carousel, CarouselContent, CarouselItem, CarouselApi } from "@/components/ui/carousel";
-import { addDays, format, startOfWeek } from "date-fns";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { addDays, format, isToday } from "date-fns";
 import { fr } from "date-fns/locale";
 import { supabase } from "@/integrations/supabase/client";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -30,19 +31,14 @@ const Index = () => {
     courtId: string;
     time: string;
   } | null>(null);
-  const [api, setApi] = useState<CarouselApi>();
-  const [currentSlide, setCurrentSlide] = useState(0);
+  const [selectedViewDate, setSelectedViewDate] = useState<Date>(new Date());
   const [userName, setUserName] = useState<string>("");
   const [changePasswordOpen, setChangePasswordOpen] = useState(false);
-  
-  // Generate 7 days starting from today
-  const today = new Date();
-  const weekDays = Array.from({ length: 7 }, (_, i) => addDays(today, i));
 
   const handleSlotClick = (courtId: string, courtName: string, hour: number) => {
     const timeStr = `${hour.toString().padStart(2, "0")}:00:00`;
     setPrefilledBooking({
-      date: weekDays[currentSlide],
+      date: selectedViewDate,
       courtId,
       time: timeStr,
     });
@@ -80,20 +76,6 @@ const Index = () => {
     fetchUserName();
   }, [user?.id]);
 
-  useEffect(() => {
-    if (!api) return;
-    
-    api.scrollTo(0);
-    const onSelect = () => setCurrentSlide(api.selectedScrollSnap());
-    onSelect();
-    api.on("select", onSelect);
-    api.on("reInit", onSelect);
-    
-    return () => {
-      api.off("select", onSelect);
-      api.off("reInit", onSelect);
-    };
-  }, [api]);
 
   if (authLoading || roleLoading) {
     return (
@@ -158,77 +140,81 @@ const Index = () => {
           <h2 className="text-xl font-semibold">
             Réservations de la semaine
           </h2>
-          {!isCoach && (
-            <Button onClick={() => setBookingOpen(true)}>
-              <Calendar className="h-4 w-4 mr-2" />
-              Réserver un terrain
-            </Button>
-          )}
+            {!isCoach && (
+              <Button onClick={() => setBookingOpen(true)}>
+                <CalendarIcon className="h-4 w-4 mr-2" />
+                Réserver un terrain
+              </Button>
+            )}
         </div>
 
-        {/* Mobile Title */}
-        <div className="mb-4 md:hidden">
-          <h2 className="text-base font-semibold text-center">
-            Prochains 7 jours
-          </h2>
-        </div>
-
-        <Carousel
-          setApi={setApi}
-          className="w-full"
-          opts={{
-            align: "start",
-            containScroll: "trimSnaps",
-            slidesToScroll: 1,
-            loop: false,
-            dragFree: false,
-            watchDrag: !isMobile,
-          }}
-        >
-          <div className="flex items-center justify-between mb-4">
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={() => api?.scrollPrev()}
-              disabled={currentSlide === 0}
-              className="relative static translate-y-0"
-            >
-              <ChevronLeft className="h-4 w-4" />
-              <span className="sr-only">Jour précédent</span>
-            </Button>
-            <div className="text-center flex-1">
-              <h3 className="text-lg font-semibold">
-                {format(weekDays[currentSlide], 'EEEE d MMMM yyyy', { locale: fr })}
-              </h3>
-              {currentSlide === 0 && (
-                <span className="text-sm text-primary">Aujourd'hui</span>
-              )}
-            </div>
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={() => api?.scrollNext()}
-              disabled={currentSlide >= weekDays.length - 1}
-              className="relative static translate-y-0"
-            >
-              <ChevronRight className="h-4 w-4" />
-              <span className="sr-only">Jour suivant</span>
-            </Button>
+        {/* Date Navigation */}
+        <div className="flex items-center justify-between mb-4">
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={() => setSelectedViewDate(addDays(selectedViewDate, -1))}
+            disabled={isToday(selectedViewDate)}
+          >
+            <ChevronLeft className="h-4 w-4" />
+            <span className="sr-only">Jour précédent</span>
+          </Button>
+          
+          <div className="text-center flex-1 flex flex-col items-center gap-1">
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="ghost" className="text-lg font-semibold hover:bg-muted px-3">
+                  {format(selectedViewDate, 'EEEE d MMMM yyyy', { locale: fr })}
+                  {isToday(selectedViewDate) && (
+                    <span className="text-sm text-primary ml-2">Aujourd'hui</span>
+                  )}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="center">
+                <Calendar
+                  mode="single"
+                  selected={selectedViewDate}
+                  onSelect={(date) => date && setSelectedViewDate(date)}
+                  disabled={(date) => {
+                    const today = new Date();
+                    today.setHours(0, 0, 0, 0);
+                    return date < today;
+                  }}
+                  className="pointer-events-auto"
+                />
+              </PopoverContent>
+            </Popover>
+            {!isToday(selectedViewDate) && (
+              <Button 
+                variant="link" 
+                size="sm"
+                className="h-auto p-0 text-xs"
+                onClick={() => setSelectedViewDate(new Date())}
+              >
+                Revenir à aujourd'hui
+              </Button>
+            )}
           </div>
           
-          <CarouselContent className="h-[calc(100vh-220px)]">
-            {weekDays.map((day, index) => (
-              <CarouselItem key={index} className="h-full">
-                <ReservationGrid 
-                  key={`${refreshKey}-${index}`} 
-                  date={day} 
-                  userId={user.id} 
-                  onSlotClick={handleSlotClick}
-                />
-              </CarouselItem>
-            ))}
-          </CarouselContent>
-        </Carousel>
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={() => setSelectedViewDate(addDays(selectedViewDate, 1))}
+          >
+            <ChevronRight className="h-4 w-4" />
+            <span className="sr-only">Jour suivant</span>
+          </Button>
+        </div>
+
+        {/* Reservation Grid */}
+        <div className="h-[calc(100vh-280px)] md:h-[calc(100vh-260px)]">
+          <ReservationGrid 
+            key={`${refreshKey}-${selectedViewDate.toISOString()}`} 
+            date={selectedViewDate} 
+            userId={user.id} 
+            onSlotClick={handleSlotClick}
+          />
+        </div>
       </main>
 
       {/* Mobile Navigation */}
