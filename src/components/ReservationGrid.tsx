@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -206,9 +206,8 @@ export const ReservationGrid = ({
               </div>
             ))}
             {filteredHours.map((hour) => (
-              <>
+              <React.Fragment key={`mobile-row-${hour}`}>
                 <div 
-                  key={`hour-${hour}`} 
                   className="font-medium p-1 bg-muted text-[10px] flex items-center justify-center sticky left-0 z-10 border-r"
                 >
                   {hour}h
@@ -218,7 +217,7 @@ export const ReservationGrid = ({
                     {getSlotContent(court.id, court.name, hour)}
                   </Card>
                 ))}
-              </>
+              </React.Fragment>
             ))}
           </div>
         </div>
@@ -227,24 +226,24 @@ export const ReservationGrid = ({
     );
   }
 
-  // Desktop: full grid without scroll
+  // Desktop: grid with vertical scroll when needed
   return (
-    <div className="w-full h-full flex flex-col">
+    <ScrollArea className="w-full h-[calc(100vh-220px)]">
       <div 
-        className="flex-1 grid gap-[1px] bg-border"
+        className="grid gap-[1px] bg-border"
         style={{
           gridTemplateColumns: `60px repeat(${courts.length}, 1fr)`,
-          gridTemplateRows: `32px repeat(${filteredHours.length}, 1fr)`,
+          gridTemplateRows: `32px repeat(${filteredHours.length}, minmax(50px, 1fr))`,
         }}
       >
         {/* Empty corner cell */}
-        <div className="font-semibold bg-muted flex items-center justify-center text-xs"></div>
+        <div className="font-semibold bg-muted flex items-center justify-center text-xs sticky top-0 z-20"></div>
         
         {/* Court headers */}
         {courts.map((court) => (
           <div 
             key={court.id} 
-            className="font-semibold bg-muted text-center text-[10px] flex items-center justify-center"
+            className="font-semibold bg-muted text-center text-[10px] flex items-center justify-center sticky top-0 z-10"
           >
             {court.name.replace("Terrain ", "T")}
           </div>
@@ -252,9 +251,8 @@ export const ReservationGrid = ({
 
         {/* Hours and slots */}
         {filteredHours.map((hour) => (
-          <>
+          <React.Fragment key={`row-${hour}`}>
             <div 
-              key={`hour-${hour}`} 
               className="font-medium bg-muted text-[11px] flex items-center justify-center"
             >
               {hour}h
@@ -264,9 +262,10 @@ export const ReservationGrid = ({
                 {getSlotContent(court.id, court.name, hour)}
               </div>
             ))}
-          </>
+          </React.Fragment>
         ))}
       </div>
-    </div>
+      <ScrollBar orientation="vertical" />
+    </ScrollArea>
   );
 };
