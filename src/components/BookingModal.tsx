@@ -43,8 +43,23 @@ export const BookingModal = ({
   const [reservationsData, setReservationsData] = useState<any[]>([]);
   const [blockedSlotsData, setBlockedSlotsData] = useState<any[]>([]);
   const [partnerRestrictions, setPartnerRestrictions] = useState<string[]>([]);
+  const [userProfile, setUserProfile] = useState<{ full_name: string } | null>(null);
   const { isAdmin } = useUserRole(userId);
   const { isCoach: currentUserIsCoach } = useCoachRestrictions(userId);
+
+  // Charger le profil utilisateur pour l'audit
+  useEffect(() => {
+    if (userId) {
+      supabase
+        .from("profiles")
+        .select("full_name")
+        .eq("id", userId)
+        .maybeSingle()
+        .then(({ data }) => {
+          if (data) setUserProfile(data);
+        });
+    }
+  }, [userId]);
 
   // Helper function to check if a user has an active reservation
   const hasActiveReservation = (reservations: any[], todayStr: string, currentTime: string) => {
@@ -402,9 +417,47 @@ export const BookingModal = ({
         created_by: userId,
       };
       
-      const { error } = await supabase.from("reservations").insert(reservationData).select();
+      const { data: insertedRes, error } = await supabase
+        .from("reservations")
+        .insert(reservationData)
+        .select()
+        .single();
       
       if (error) throw error;
+
+      // Logger la création dans l'audit
+      const player1Profile = partners.find(p => p.id === reservationData.player1_id);
+      const player2Profile = partners.find(p => p.id === reservationData.player2_id);
+      const courtName = courts.find(c => c.id === reservationData.court_id)?.name;
+      
+      const player1Name = isAdmin 
+        ? (player1Profile?.full_name || "Joueur 1") 
+        : (userProfile?.full_name || "Inconnu");
+      const player2Name = isAdmin 
+        ? (player2Profile?.full_name || "Joueur 2") 
+        : (partners.find(p => p.id === selectedPartner)?.full_name || "Partenaire");
+
+      try {
+        await supabase.rpc("log_action", {
+          _performed_by: userId,
+          _performer_name: userProfile?.full_name || "Inconnu",
+          _action_type: "CREATE",
+          _entity_type: "RESERVATION",
+          _entity_id: insertedRes?.id || null,
+          _old_values: null,
+          _new_values: {
+            date: reservationData.date,
+            court: courtName,
+            start_time: reservationData.start_time,
+            end_time: reservationData.end_time,
+            player1: player1Name,
+            player2: player2Name,
+          },
+          _description: `Nouvelle réservation: ${player1Name} avec ${player2Name} le ${reservationData.date}`,
+        });
+      } catch (auditErr) {
+        console.error("Erreur audit log:", auditErr);
+      }
 
       toast.success("Réservation créée avec succès !");
       onSuccess();
