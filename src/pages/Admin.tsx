@@ -340,14 +340,14 @@ const Admin = () => {
       // Ajouter le nouveau rôle
       const { error: roleError } = await supabase
         .from("user_roles")
-        .insert([{ user_id: selectedMember.id, role: newRole as "admin" | "coach" | "player" | "super_coach" }]);
+        .insert([{ user_id: selectedMember.id, role: newRole as "admin" | "coach" | "player" | "super_coach" | "elite" }]);
 
       if (roleError) {
         console.error("Erreur insertion nouveau rôle:", roleError);
         // Tenter de restaurer l'ancien rôle pour éviter un état incohérent
         await supabase
           .from("user_roles")
-          .insert([{ user_id: selectedMember.id, role: currentRole as "admin" | "coach" | "player" | "super_coach" }]);
+          .insert([{ user_id: selectedMember.id, role: currentRole as "admin" | "coach" | "player" | "super_coach" | "elite" }]);
         
         toast.error("Erreur lors de la modification du rôle");
         return;
@@ -720,6 +720,7 @@ const Admin = () => {
                               </SelectTrigger>
                               <SelectContent>
                                 <SelectItem value="player">Joueur</SelectItem>
+                                <SelectItem value="elite">Elite</SelectItem>
                                 <SelectItem value="coach">Coach</SelectItem>
                                 <SelectItem value="super_coach">Super Coach</SelectItem>
                                 <SelectItem value="admin">Administrateur</SelectItem>
@@ -818,6 +819,7 @@ const Admin = () => {
                             return (
                               <>
                                 {role}
+                                {role === 'elite' && ' ⚡'}
                                 {role === 'coach' && ' 🎾'}
                                 {role === 'super_coach' && ' ⭐🎾'}
                               </>
@@ -902,6 +904,7 @@ const Admin = () => {
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="player">Joueur</SelectItem>
+                          <SelectItem value="elite">Elite</SelectItem>
                           <SelectItem value="coach">Coach</SelectItem>
                           <SelectItem value="super_coach">Super Coach</SelectItem>
                           <SelectItem value="admin">Administrateur</SelectItem>

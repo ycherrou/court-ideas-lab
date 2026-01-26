@@ -94,6 +94,18 @@ export const BookingModal = ({
     return !!data;
   };
 
+  // Helper function to check if a user is elite
+  const isElite = async (playerId: string): Promise<boolean> => {
+    const { data } = await supabase
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", playerId)
+      .eq("role", "elite")
+      .maybeSingle();
+    
+    return !!data;
+  };
+
   // Helper function to count active reservations
   const countActiveReservations = (reservations: any[], todayStr: string, currentTime: string): number => {
     return reservations.filter((res) => {
@@ -255,29 +267,58 @@ export const BookingModal = ({
     if (blocked.data) setBlockedSlotsData(blocked.data);
   };
 
-  // Vérifier si un joueur est un coach et si la date est trop lointaine
-  const checkCoachDateRestriction = async (playerId: string): Promise<boolean> => {
+  // Vérifier si un joueur a des restrictions de date (coach J+1, elite J+2)
+  const checkPlayerDateRestriction = async (playerId: string): Promise<{ ok: boolean; message?: string }> => {
     const { data: roles } = await supabase
       .from("user_roles")
       .select("role")
       .eq("user_id", playerId)
-      .in("role", ["coach", "super_coach"])
-      .maybeSingle();
+      .in("role", ["coach", "super_coach", "elite"]);
 
-    if (roles) {
-      // C'est un coach - vérifier la date
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
+    const role = roles?.[0]?.role;
+    if (!role) return { ok: true };
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    if (role === "elite") {
+      // J+2 pour Elite
+      const maxDate = new Date(today);
+      maxDate.setDate(maxDate.getDate() + 2);
+      maxDate.setHours(23, 59, 59, 999);
       
+      if (selectedDate && selectedDate > maxDate) {
+        return { ok: false, message: "Les joueurs Elite ne peuvent réserver que jusqu'à après-demain (J+2)" };
+      }
+    } else {
+      // J+1 pour Coach/Super Coach
       const tomorrow = new Date(today);
       tomorrow.setDate(tomorrow.getDate() + 1);
       tomorrow.setHours(23, 59, 59, 999);
       
       if (selectedDate && selectedDate > tomorrow) {
-        return false; // Date trop lointaine
+        return { ok: false, message: "Les réservations avec un coach ne sont possibles que pour aujourd'hui ou demain" };
       }
     }
-    return true; // OK
+    
+    return { ok: true };
+  };
+
+  // Vérifier la limite quotidienne de 2h pour les joueurs Elite
+  const checkEliteDailyLimit = async (playerId: string, dateStr: string): Promise<{ ok: boolean; message?: string }> => {
+    const isElitePlayer = await isElite(playerId);
+    if (!isElitePlayer) return { ok: true };
+
+    const { data: reservations } = await supabase
+      .from("reservations")
+      .select("id")
+      .eq("date", dateStr)
+      .or(`player1_id.eq.${playerId},player2_id.eq.${playerId}`);
+
+    if ((reservations?.length || 0) >= 2) {
+      return { ok: false, message: "Limite de 2 heures par jour atteinte pour ce joueur Elite" };
+    }
+    return { ok: true };
   };
 
   const handleConfirm = async () => {
@@ -298,17 +339,23 @@ export const BookingModal = ({
 
     setLoading(true);
 
-    // Vérifier la restriction de date pour les coachs
+    // Vérifier la restriction de date pour les coachs et Elite
     const player1Id = isAdmin ? selectedPlayer1 : userId;
     const player2Id = isAdmin ? selectedPlayer2 : selectedPartner;
 
-    const [player1Ok, player2Ok] = await Promise.all([
-      checkCoachDateRestriction(player1Id),
-      checkCoachDateRestriction(player2Id),
+    const [player1DateCheck, player2DateCheck] = await Promise.all([
+      checkPlayerDateRestriction(player1Id),
+      checkPlayerDateRestriction(player2Id),
     ]);
 
-    if (!player1Ok || !player2Ok) {
-      toast.error("Les réservations avec un coach ne sont possibles que pour aujourd'hui ou demain");
+    if (!player1DateCheck.ok) {
+      toast.error(player1DateCheck.message);
+      setLoading(false);
+      return;
+    }
+
+    if (!player2DateCheck.ok) {
+      toast.error(player2DateCheck.message);
       setLoading(false);
       return;
     }
@@ -318,6 +365,30 @@ export const BookingModal = ({
       const month = String(selectedDate.getMonth() + 1).padStart(2, '0');
       const day = String(selectedDate.getDate()).padStart(2, '0');
       const dateStr = `${year}-${month}-${day}`;
+
+      // Vérifier la limite quotidienne Elite avant de créer la réservation
+      const [elite1Check, elite2Check] = await Promise.all([
+        checkEliteDailyLimit(player1Id, dateStr),
+        checkEliteDailyLimit(player2Id, dateStr),
+      ]);
+
+      if (!elite1Check.ok) {
+        toast.error(isAdmin 
+          ? "Le joueur 1 (Elite) a atteint sa limite de 2h pour ce jour"
+          : "Vous avez atteint votre limite de 2 heures pour cette journée"
+        );
+        setLoading(false);
+        return;
+      }
+
+      if (!elite2Check.ok) {
+        toast.error(isAdmin 
+          ? "Le joueur 2 (Elite) a atteint sa limite de 2h pour ce jour"
+          : "Votre partenaire (Elite) a atteint sa limite de 2 heures pour cette journée"
+        );
+        setLoading(false);
+        return;
+      }
       
       const [hourStr] = selectedTime.split(":");
       const hour = parseInt(hourStr);
@@ -363,9 +434,6 @@ export const BookingModal = ({
       const todayDay = String(today.getDate()).padStart(2, '0');
       const todayStr = `${todayYear}-${todayMonth}-${todayDay}`;
       const currentTime = `${String(today.getHours()).padStart(2, '0')}:${String(today.getMinutes()).padStart(2, '0')}:00`;
-
-      const player1Id = isAdmin ? selectedPlayer1 : userId;
-      const player2Id = isAdmin ? selectedPlayer2 : selectedPartner;
 
       // Check player 1 reservation limit
       const player1MaxRes = await getMaxReservations(player1Id);

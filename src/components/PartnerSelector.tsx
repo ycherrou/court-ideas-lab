@@ -57,7 +57,18 @@ export function PartnerSelector({
     return selectedDate > tomorrow;
   };
 
+  // Vérifier si la date sélectionnée dépasse J+2 (restriction elite)
+  const isDateBeyondJ2 = (): boolean => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const j2 = new Date(today);
+    j2.setDate(j2.getDate() + 2);
+    j2.setHours(23, 59, 59, 999);
+    return selectedDate > j2;
+  };
+
   const coachDateRestricted = isDateBeyondTomorrow();
+  const eliteDateRestricted = isDateBeyondJ2();
 
   // Load data when modal opens
   useEffect(() => {
@@ -84,11 +95,11 @@ export function PartnerSelector({
 
     const adminIds = adminRoles?.map((r) => r.user_id) || [];
 
-    // Load coach roles
+    // Load coach and elite roles
     const { data: coachRolesData } = await supabase
       .from("user_roles")
       .select("user_id, role")
-      .in("role", ["coach", "super_coach"]);
+      .in("role", ["coach", "super_coach", "elite"]);
 
     const coachMap = new Map<string, string>();
     coachRolesData?.forEach((r) => coachMap.set(r.user_id, r.role));
@@ -220,18 +231,20 @@ export function PartnerSelector({
             {favorites.length > 0 && !searchQuery && (
               <CommandGroup heading="⭐ Favoris">
                 {filterPartners(favorites).map((partner) => {
-                  const isCoach = coachRoles.has(partner.id);
-                  const isDisabled = isCoach && coachDateRestricted;
+                  const role = coachRoles.get(partner.id);
+                  const isCoach = role === 'coach' || role === 'super_coach';
+                  const isElitePlayer = role === 'elite';
+                  const isDisabled = (isCoach && coachDateRestricted) || (isElitePlayer && eliteDateRestricted);
                   return (
                     <CommandItem
                       key={partner.id}
                       value={partner.id}
                       onSelect={() => {
                         if (isDisabled) {
-                          toast({ 
-                            description: "Réservation avec un coach possible uniquement pour aujourd'hui ou demain",
-                            variant: "destructive"
-                          });
+                          const msg = isElitePlayer 
+                            ? "Réservation avec un joueur Elite possible uniquement jusqu'à J+2"
+                            : "Réservation avec un coach possible uniquement pour aujourd'hui ou demain";
+                          toast({ description: msg, variant: "destructive" });
                           return;
                         }
                         onValueChange(partner.id);
@@ -244,9 +257,11 @@ export function PartnerSelector({
                     >
                       <span className={cn(value === partner.id && "font-medium")}>
                         {partner.full_name}
-                        {coachRoles.get(partner.id) === 'coach' && ' 🎾'}
-                        {coachRoles.get(partner.id) === 'super_coach' && ' ⭐🎾'}
-                        {isDisabled && ' (J/J+1 uniquement)'}
+                        {role === 'coach' && ' 🎾'}
+                        {role === 'super_coach' && ' ⭐🎾'}
+                        {role === 'elite' && ' ⚡'}
+                        {isCoach && isDisabled && ' (J/J+1 uniquement)'}
+                        {isElitePlayer && isDisabled && ' (J/J+1/J+2 uniquement)'}
                       </span>
                       <Star
                         className="h-4 w-4 cursor-pointer fill-yellow-400 text-yellow-400"
@@ -267,18 +282,20 @@ export function PartnerSelector({
                 {filterPartners(recents)
                   .filter((p) => !favoriteIds.has(p.id))
                   .map((partner) => {
-                    const isCoach = coachRoles.has(partner.id);
-                    const isDisabled = isCoach && coachDateRestricted;
+                    const role = coachRoles.get(partner.id);
+                    const isCoach = role === 'coach' || role === 'super_coach';
+                    const isElitePlayer = role === 'elite';
+                    const isDisabled = (isCoach && coachDateRestricted) || (isElitePlayer && eliteDateRestricted);
                     return (
                       <CommandItem
                         key={partner.id}
                         value={partner.id}
                         onSelect={() => {
                           if (isDisabled) {
-                            toast({ 
-                              description: "Réservation avec un coach possible uniquement pour aujourd'hui ou demain",
-                              variant: "destructive"
-                            });
+                            const msg = isElitePlayer 
+                              ? "Réservation avec un joueur Elite possible uniquement jusqu'à J+2"
+                              : "Réservation avec un coach possible uniquement pour aujourd'hui ou demain";
+                            toast({ description: msg, variant: "destructive" });
                             return;
                           }
                           onValueChange(partner.id);
@@ -291,9 +308,11 @@ export function PartnerSelector({
                       >
                         <span className={cn(value === partner.id && "font-medium")}>
                           {partner.full_name}
-                          {coachRoles.get(partner.id) === 'coach' && ' 🎾'}
-                          {coachRoles.get(partner.id) === 'super_coach' && ' ⭐🎾'}
-                          {isDisabled && ' (J/J+1 uniquement)'}
+                          {role === 'coach' && ' 🎾'}
+                          {role === 'super_coach' && ' ⭐🎾'}
+                          {role === 'elite' && ' ⚡'}
+                          {isCoach && isDisabled && ' (J/J+1 uniquement)'}
+                          {isElitePlayer && isDisabled && ' (J/J+1/J+2 uniquement)'}
                         </span>
                         <Star
                           className="h-4 w-4 cursor-pointer text-muted-foreground hover:text-yellow-400"
@@ -314,18 +333,20 @@ export function PartnerSelector({
                 .filter((p) => !favoriteIds.has(p.id) && !recents.some((r) => r.id === p.id))
                 .slice(0, searchQuery ? 200 : 100)
                 .map((partner) => {
-                  const isCoach = coachRoles.has(partner.id);
-                  const isDisabled = isCoach && coachDateRestricted;
+                  const role = coachRoles.get(partner.id);
+                  const isCoach = role === 'coach' || role === 'super_coach';
+                  const isElitePlayer = role === 'elite';
+                  const isDisabled = (isCoach && coachDateRestricted) || (isElitePlayer && eliteDateRestricted);
                   return (
                     <CommandItem
                       key={partner.id}
                       value={partner.id}
                       onSelect={() => {
                         if (isDisabled) {
-                          toast({ 
-                            description: "Réservation avec un coach possible uniquement pour aujourd'hui ou demain",
-                            variant: "destructive"
-                          });
+                          const msg = isElitePlayer 
+                            ? "Réservation avec un joueur Elite possible uniquement jusqu'à J+2"
+                            : "Réservation avec un coach possible uniquement pour aujourd'hui ou demain";
+                          toast({ description: msg, variant: "destructive" });
                           return;
                         }
                         onValueChange(partner.id);
@@ -338,9 +359,11 @@ export function PartnerSelector({
                     >
                       <span className={cn(value === partner.id && "font-medium")}>
                         {partner.full_name}
-                        {coachRoles.get(partner.id) === 'coach' && ' 🎾'}
-                        {coachRoles.get(partner.id) === 'super_coach' && ' ⭐🎾'}
-                        {isDisabled && ' (J/J+1 uniquement)'}
+                        {role === 'coach' && ' 🎾'}
+                        {role === 'super_coach' && ' ⭐🎾'}
+                        {role === 'elite' && ' ⚡'}
+                        {isCoach && isDisabled && ' (J/J+1 uniquement)'}
+                        {isElitePlayer && isDisabled && ' (J/J+1/J+2 uniquement)'}
                       </span>
                       <Star
                         className="h-4 w-4 cursor-pointer text-muted-foreground hover:text-yellow-400"

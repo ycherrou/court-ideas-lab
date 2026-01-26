@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 export const useCoachRestrictions = (userId: string | undefined) => {
   const [isCoach, setIsCoach] = useState(false);
   const [isSuperCoach, setIsSuperCoach] = useState(false);
+  const [isElite, setIsElite] = useState(false);
   const [loading, setLoading] = useState(true);
   const [allowedCourtIds, setAllowedCourtIds] = useState<string[]>([]);
 
@@ -11,23 +12,26 @@ export const useCoachRestrictions = (userId: string | undefined) => {
     if (!userId) {
       setIsCoach(false);
       setIsSuperCoach(false);
+      setIsElite(false);
       setLoading(true);
       return;
     }
 
     const fetchRole = async () => {
-      // Vérifier si coach ou super_coach
+      // Vérifier si coach, super_coach ou elite
       const { data: roles } = await supabase
         .from("user_roles")
         .select("role")
         .eq("user_id", userId)
-        .in("role", ["coach", "super_coach"]);
+        .in("role", ["coach", "super_coach", "elite"]);
 
       const coachRole = roles?.find((r) => r.role === "coach");
       const superCoachRole = roles?.find((r) => r.role === "super_coach");
+      const eliteRole = roles?.find((r) => r.role === "elite");
 
       setIsCoach(!!coachRole);
       setIsSuperCoach(!!superCoachRole);
+      setIsElite(!!eliteRole);
 
       // Si coach (pas super coach), récupérer les terrains autorisés
       if (coachRole && !superCoachRole) {
@@ -47,5 +51,5 @@ export const useCoachRestrictions = (userId: string | undefined) => {
     fetchRole();
   }, [userId]);
 
-  return { isCoach, isSuperCoach, allowedCourtIds, loading };
+  return { isCoach, isSuperCoach, isElite, allowedCourtIds, loading };
 };
