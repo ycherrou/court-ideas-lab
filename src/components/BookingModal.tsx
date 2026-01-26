@@ -119,6 +119,7 @@ export const BookingModal = ({
   const getMaxReservations = async (playerId: string): Promise<number> => {
     if (await isSuperCoach(playerId)) return 4;
     if (await isCoach(playerId)) return 2;
+    if (await isElite(playerId)) return 999; // Pas de limite globale, seule la limite quotidienne s'applique
     return 1;
   };
 
