@@ -291,8 +291,8 @@ export const BookingModal = ({
       if (selectedDate && selectedDate > maxDate) {
         return { ok: false, message: "Les joueurs Elite ne peuvent réserver que jusqu'à après-demain (J+2)" };
       }
-    } else {
-      // J+1 pour Coach/Super Coach
+  } else if (role === "coach") {
+      // J+1 seulement pour Coach (pas super_coach)
       const tomorrow = new Date(today);
       tomorrow.setDate(tomorrow.getDate() + 1);
       tomorrow.setHours(23, 59, 59, 999);
@@ -301,6 +301,7 @@ export const BookingModal = ({
         return { ok: false, message: "Les réservations avec un coach ne sont possibles que pour aujourd'hui ou demain" };
       }
     }
+    // super_coach : pas de restriction de date
     
     return { ok: true };
   };
