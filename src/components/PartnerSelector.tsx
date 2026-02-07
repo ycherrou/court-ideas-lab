@@ -232,9 +232,9 @@ export function PartnerSelector({
               <CommandGroup heading="⭐ Favoris">
                 {filterPartners(favorites).map((partner) => {
                   const role = coachRoles.get(partner.id);
-                  const isCoach = role === 'coach' || role === 'super_coach';
+                  const isCoachOnly = role === 'coach';  // super_coach n'a plus de restriction de date
                   const isElitePlayer = role === 'elite';
-                  const isDisabled = (isCoach && coachDateRestricted) || (isElitePlayer && eliteDateRestricted);
+                  const isDisabled = (isCoachOnly && coachDateRestricted) || (isElitePlayer && eliteDateRestricted);
                   return (
                     <CommandItem
                       key={partner.id}
@@ -260,7 +260,7 @@ export function PartnerSelector({
                         {role === 'coach' && ' 🎾'}
                         {role === 'super_coach' && ' ⭐🎾'}
                         {role === 'elite' && ' ⚡'}
-                        {isCoach && isDisabled && ' (J/J+1 uniquement)'}
+                        {isCoachOnly && isDisabled && ' (J/J+1 uniquement)'}
                         {isElitePlayer && isDisabled && ' (J/J+1/J+2 uniquement)'}
                       </span>
                       <Star
@@ -282,10 +282,10 @@ export function PartnerSelector({
                 {filterPartners(recents)
                   .filter((p) => !favoriteIds.has(p.id))
                   .map((partner) => {
-                    const role = coachRoles.get(partner.id);
-                    const isCoach = role === 'coach' || role === 'super_coach';
-                    const isElitePlayer = role === 'elite';
-                    const isDisabled = (isCoach && coachDateRestricted) || (isElitePlayer && eliteDateRestricted);
+                  const role = coachRoles.get(partner.id);
+                  const isCoachOnly = role === 'coach';  // super_coach n'a plus de restriction de date
+                  const isElitePlayer = role === 'elite';
+                  const isDisabled = (isCoachOnly && coachDateRestricted) || (isElitePlayer && eliteDateRestricted);
                     return (
                       <CommandItem
                         key={partner.id}
@@ -308,11 +308,11 @@ export function PartnerSelector({
                       >
                         <span className={cn(value === partner.id && "font-medium")}>
                           {partner.full_name}
-                          {role === 'coach' && ' 🎾'}
-                          {role === 'super_coach' && ' ⭐🎾'}
-                          {role === 'elite' && ' ⚡'}
-                          {isCoach && isDisabled && ' (J/J+1 uniquement)'}
-                          {isElitePlayer && isDisabled && ' (J/J+1/J+2 uniquement)'}
+                        {role === 'coach' && ' 🎾'}
+                        {role === 'super_coach' && ' ⭐🎾'}
+                        {role === 'elite' && ' ⚡'}
+                        {isCoachOnly && isDisabled && ' (J/J+1 uniquement)'}
+                        {isElitePlayer && isDisabled && ' (J/J+1/J+2 uniquement)'}
                         </span>
                         <Star
                           className="h-4 w-4 cursor-pointer text-muted-foreground hover:text-yellow-400"
@@ -334,9 +334,9 @@ export function PartnerSelector({
                 .slice(0, searchQuery ? 200 : 100)
                 .map((partner) => {
                   const role = coachRoles.get(partner.id);
-                  const isCoach = role === 'coach' || role === 'super_coach';
+                  const isCoachOnly = role === 'coach';  // super_coach n'a plus de restriction de date
                   const isElitePlayer = role === 'elite';
-                  const isDisabled = (isCoach && coachDateRestricted) || (isElitePlayer && eliteDateRestricted);
+                  const isDisabled = (isCoachOnly && coachDateRestricted) || (isElitePlayer && eliteDateRestricted);
                   return (
                     <CommandItem
                       key={partner.id}
@@ -362,7 +362,7 @@ export function PartnerSelector({
                         {role === 'coach' && ' 🎾'}
                         {role === 'super_coach' && ' ⭐🎾'}
                         {role === 'elite' && ' ⚡'}
-                        {isCoach && isDisabled && ' (J/J+1 uniquement)'}
+                        {isCoachOnly && isDisabled && ' (J/J+1 uniquement)'}
                         {isElitePlayer && isDisabled && ' (J/J+1/J+2 uniquement)'}
                       </span>
                       <Star
