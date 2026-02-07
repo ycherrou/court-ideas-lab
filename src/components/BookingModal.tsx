@@ -323,21 +323,30 @@ export const BookingModal = ({
     const player1Id = isAdmin ? selectedPlayer1 : userId;
     const player2Id = isAdmin ? selectedPlayer2 : selectedPartner;
 
-    const [player1DateCheck, player2DateCheck] = await Promise.all([
-      checkPlayerDateRestriction(player1Id),
-      checkPlayerDateRestriction(player2Id),
+    // Vérifier si le partenaire est un entraîneur (pour ignorer sa restriction de date)
+    const [player2IsCoachForDate, player2IsSuperCoachForDate] = await Promise.all([
+      isCoach(player2Id),
+      isSuperCoach(player2Id),
     ]);
+    const partnerIsInstructorForDate = player2IsCoachForDate || player2IsSuperCoachForDate;
 
+    // Toujours vérifier la restriction du joueur 1 (celui qui réserve)
+    const player1DateCheck = await checkPlayerDateRestriction(player1Id);
     if (!player1DateCheck.ok) {
       toast.error(player1DateCheck.message);
       setLoading(false);
       return;
     }
 
-    if (!player2DateCheck.ok) {
-      toast.error(player2DateCheck.message);
-      setLoading(false);
-      return;
+    // Ne pas appliquer la restriction de date si le partenaire est un entraîneur
+    // (le joueur peut réserver avec un coach pour n'importe quelle date)
+    if (!partnerIsInstructorForDate) {
+      const player2DateCheck = await checkPlayerDateRestriction(player2Id);
+      if (!player2DateCheck.ok) {
+        toast.error(player2DateCheck.message);
+        setLoading(false);
+        return;
+      }
     }
     try {
       // Fix timezone issue: use local date without timezone conversion
