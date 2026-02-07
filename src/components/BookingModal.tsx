@@ -215,30 +215,8 @@ export const BookingModal = ({
     
     setSelectedDate(normalizedDate);
     
-    // Check for active reservation limits (pas pour les admins)
-    if (!isAdmin) {
-      const today = new Date();
-      const todayYear = today.getFullYear();
-      const todayMonth = String(today.getMonth() + 1).padStart(2, '0');
-      const todayDay = String(today.getDate()).padStart(2, '0');
-      const todayStr = `${todayYear}-${todayMonth}-${todayDay}`;
-      const currentTime = `${String(today.getHours()).padStart(2, '0')}:${String(today.getMinutes()).padStart(2, '0')}:00`;
-      
-      const maxReservations = await getMaxReservations(userId);
-      
-      const { data: activeRes } = await supabase
-        .from("reservations")
-        .select("*")
-        .or(`player1_id.eq.${userId},player2_id.eq.${userId}`)
-        .gte('date', todayStr);
-
-      const activeCount = activeRes ? countActiveReservations(activeRes, todayStr, currentTime) : 0;
-      
-      if (activeCount >= maxReservations) {
-        toast.error(`Vous avez atteint la limite de ${maxReservations} réservation(s) active(s)`);
-        return;
-      }
-    }
+    // Note: La vérification de limite sera faite lors de la confirmation
+    // pour permettre aux joueurs de réserver avec un entraîneur même s'ils ont une réservation active
 
     // Load data for step 2
     await handleSlotSelect(date);
@@ -447,7 +425,13 @@ export const BookingModal = ({
 
       const player1ActiveCount = player1ActiveRes ? countActiveReservations(player1ActiveRes, todayStr, currentTime) : 0;
 
-      if (player1ActiveCount >= player1MaxRes) {
+      // Vérifier si le partenaire est un entraîneur (coach ou super_coach)
+      const player2IsCoach = await isCoach(player2Id);
+      const player2IsSuperCoach = await isSuperCoach(player2Id);
+      const partnerIsInstructor = player2IsCoach || player2IsSuperCoach;
+
+      // Si le partenaire est un entraîneur, on ignore la limite du joueur 1
+      if (!partnerIsInstructor && player1ActiveCount >= player1MaxRes) {
         const roleLabel = player1MaxRes === 4 ? "super coach" : player1MaxRes === 2 ? "coach" : "joueur";
         toast.error(isAdmin 
           ? `Le joueur 1 a atteint sa limite de ${player1MaxRes} réservation(s) (${roleLabel})`
