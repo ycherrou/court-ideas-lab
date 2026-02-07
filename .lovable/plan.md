@@ -1,82 +1,84 @@
 
 
-## Permettre aux joueurs de reserver avec un entraineur sans restriction de match en cours
+## Corriger la restriction de date J+1 pour les reservations avec un entraineur
 
-### Contexte actuel
-Actuellement, un joueur avec une reservation active (match pas encore termine) ne peut pas faire de nouvelle reservation. Cette regle est appliquee a deux niveaux :
+### Probleme identifie
+Dans `BookingModal.tsx` (lignes 326-341), la fonction `checkPlayerDateRestriction` est appelee pour les deux joueurs. Quand le partenaire (player2) est un coach, cette verification bloque la reservation avec l'erreur "Les reservations avec un coach ne sont possibles que pour aujourd'hui ou demain".
 
-1. **Frontend** (`BookingModal.tsx`) : Verification via `countActiveReservations` et `getMaxReservations`
-2. **Base de donnees** : Politique RLS `"Players can create reservations if no active reservation"` qui bloque l'insertion
+Cette logique est incorrecte : la restriction J+1 devrait s'appliquer uniquement quand le coach lui-meme fait la reservation, pas quand un joueur reserve une session avec un coach.
 
-### Modification demandee
-Lever cette restriction quand le partenaire choisi est un **coach** ou **super_coach**, permettant au joueur de reserver une session d'entrainement meme s'il a deja un match planifie.
+### Solution
+Modifier la logique pour que la restriction de date du partenaire (player2) ne s'applique pas s'il est entraineur.
 
-### Solution technique
+### Modification a apporter
 
-#### 1. Modifier le Frontend (`src/components/BookingModal.tsx`)
+**Fichier** : `src/components/BookingModal.tsx`
 
-**Verification lors de la selection de date (lignes 218-241)** :
-- Ajouter une verification pour savoir si le partenaire selectionne est un entraineur
-- Si oui, ne pas bloquer meme si le joueur a atteint sa limite
+**Lignes 322-341** - Ajouter une verification du role du partenaire avant d'appliquer sa restriction de date :
 
-**Verification finale avant insertion (lignes 440-478)** :
-- Modifier la logique de `player1ActiveCount >= player1MaxRes` pour exclure les cas ou le partenaire est un entraineur
-- Pour player1 (le joueur qui reserve) : ignorer la limite si player2 est coach/super_coach
-- Pour player2 : cette verification ne change pas car les entraineurs ont deja une limite plus elevee
-
-Modifications specifiques :
 ```text
-Ligne 448-458 : Ajouter une condition pour verifier si player2 est coach/super_coach
-  - Si oui, ignorer la verification de limite pour player1
+Avant :
+  const [player1DateCheck, player2DateCheck] = await Promise.all([
+    checkPlayerDateRestriction(player1Id),
+    checkPlayerDateRestriction(player2Id),
+  ]);
 
-Ligne 468-478 : Garder cette verification car elle concerne le partenaire
-  - Les coachs ont deja des limites differentes gerees par getMaxReservations
+  if (!player1DateCheck.ok) { ... }
+  if (!player2DateCheck.ok) { ... }
+
+Apres :
+  // Verifier si le partenaire est un entraineur
+  const [player2IsCoach, player2IsSuperCoach] = await Promise.all([
+    isCoach(player2Id),
+    isSuperCoach(player2Id),
+  ]);
+  const partnerIsInstructor = player2IsCoach || player2IsSuperCoach;
+
+  // Toujours verifier la restriction du joueur 1 (celui qui reserve)
+  const player1DateCheck = await checkPlayerDateRestriction(player1Id);
+  if (!player1DateCheck.ok) {
+    toast.error(player1DateCheck.message);
+    setLoading(false);
+    return;
+  }
+
+  // Ne pas appliquer la restriction de date si le partenaire est un entraineur
+  // (le joueur peut reserver avec un coach pour n'importe quelle date)
+  if (!partnerIsInstructor) {
+    const player2DateCheck = await checkPlayerDateRestriction(player2Id);
+    if (!player2DateCheck.ok) {
+      toast.error(player2DateCheck.message);
+      setLoading(false);
+      return;
+    }
+  }
 ```
 
-#### 2. Modifier la politique RLS (migration SQL)
+### Logique metier clarifiee
 
-Mettre a jour la politique `"Players can create reservations if no active reservation"` pour exclure les cas ou l'un des joueurs est un entraineur :
+| Qui reserve | Avec qui | Restriction de date appliquee |
+|-------------|----------|-------------------------------|
+| Joueur | Joueur | Aucune (joueurs sans restriction) |
+| Joueur | Coach | Aucune (on ignore la restriction J+1 du coach) |
+| Joueur | Super Coach | Aucune (super coach sans restriction) |
+| Coach | Joueur | J+1 (restriction du coach qui reserve) |
+| Coach | Coach | J+1 (restriction du coach qui reserve) |
+| Super Coach | Joueur | Aucune |
+| Elite | Joueur | J+2 |
+| Elite | Coach | J+2 (restriction Elite s'applique toujours) |
 
-```sql
--- La verification de reservation unique ne s'applique pas si le partenaire est un entraineur
-CREATE POLICY "Players can create reservations if no active reservation" 
-ON public.reservations 
-FOR INSERT 
-WITH CHECK (
-  has_role(auth.uid(), 'admin'::app_role) 
-  OR (
-    auth.uid() = player1_id 
-    AND (
-      -- Les coachs et super_coachs peuvent creer sans restriction
-      has_role(auth.uid(), 'coach'::app_role)
-      OR has_role(auth.uid(), 'super_coach'::app_role)
-      -- Si le partenaire (player2) est un entraineur, pas de restriction
-      OR has_role(player2_id, 'coach'::app_role)
-      OR has_role(player2_id, 'super_coach'::app_role)
-      OR (
-        -- Les players normaux doivent ne pas avoir de reservation active
-        NOT has_role(auth.uid(), 'coach'::app_role)
-        AND NOT has_role(auth.uid(), 'super_coach'::app_role)
-        AND NOT EXISTS (
-          SELECT 1 FROM reservations r
-          WHERE ((r.player1_id = auth.uid()) OR (r.player2_id = auth.uid()))
-            AND ((r.date > CURRENT_DATE) OR (r.date = CURRENT_DATE AND r.start_time > CURRENT_TIME))
-        )
-      )
-    )
-  )
-);
-```
+### Rappel des regles completes par role
 
-### Resume des changements
-
-| Fichier | Modification |
-|---------|--------------|
-| `src/components/BookingModal.tsx` | Ignorer la limite de reservation pour player1 si player2 est coach/super_coach |
-| Migration SQL | Ajouter conditions `has_role(player2_id, 'coach')` et `has_role(player2_id, 'super_coach')` |
+| Role | Terrains | Limite reservations | Horizon de date |
+|------|----------|---------------------|-----------------|
+| Joueur | Tous | 1 active (bypass si avec entraineur) | Illimite |
+| Elite | Tous | 2h/jour max | J+2 |
+| Coach | 5, 6, 7, 8, 9, Central | 2 actives | J+1 |
+| Super Coach | Tous | 4 actives | Illimite |
+| Admin | Tous | Illimite | Illimite |
 
 ### Impact
-- Un joueur avec 1 reservation active peut reserver une session avec un entraineur
-- La limite de 1 reservation s'applique toujours entre joueurs normaux
-- Les entraineurs conservent leurs propres limites (2 pour coach, 4 pour super_coach)
+- Un joueur pourra reserver avec un coach pour n'importe quelle date future
+- Le coach qui fait lui-meme une reservation reste limite a J+1
+- Les autres restrictions (limites de reservations, terrains) restent inchangees
 
