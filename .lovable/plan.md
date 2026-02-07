@@ -1,40 +1,50 @@
 
 
-## Corriger la limite de réservations pour les joueurs Elite
+## Supprimer la restriction J/J+1 pour les Super Coaches
 
-### Problème identifié
-La fonction `getMaxReservations` ne gère pas le rôle "elite". Les joueurs Elite sont donc traités comme des joueurs normaux avec une limite de 1 réservation active globalement.
+### Probleme actuel
+Dans `BookingModal.tsx`, la fonction `checkPlayerDateRestriction` applique la meme restriction de date aux **coaches** et aux **super coaches** : ils ne peuvent reserver que pour aujourd'hui (J) ou demain (J+1).
 
-Or, les règles pour Elite sont différentes :
-- **Pas de limite globale** de réservations actives
-- **2 heures maximum par jour** (cette vérification existe déjà via `checkEliteDailyLimit`)
-- Horizon J, J+1, J+2
+Les super coaches devraient pouvoir reserver sans limite de date, comme les joueurs normaux.
 
 ### Solution
-Modifier `getMaxReservations` pour exclure les joueurs Elite de la limite globale en leur attribuant une limite très élevée (999), car leur vraie restriction est la limite quotidienne de 2h qui est déjà vérifiée ailleurs.
+Modifier la fonction `checkPlayerDateRestriction` pour exclure les super coaches de la verification J+1.
 
-### Modification à apporter
+### Modification a apporter
 
 **Fichier** : `src/components/BookingModal.tsx`
 
-**Lignes 119-123** - Ajouter la vérification Elite :
+**Lignes 271-306** - Modifier la logique pour ne plus restreindre les super coaches :
 
-```typescript
-const getMaxReservations = async (playerId: string): Promise<number> => {
-  if (await isSuperCoach(playerId)) return 4;
-  if (await isCoach(playerId)) return 2;
-  if (await isElite(playerId)) return 999; // Pas de limite globale, seule la limite quotidienne s'applique
-  return 1;
-};
+```text
+Avant :
+  } else {
+    // J+1 pour Coach/Super Coach
+    const tomorrow = new Date(today);
+    ...
+  }
+
+Apres :
+  } else if (role === "coach") {
+    // J+1 seulement pour Coach (pas super_coach)
+    const tomorrow = new Date(today);
+    ...
+  }
+  // super_coach : pas de restriction de date
 ```
 
-### Résumé des changements
-| Fichier | Modification |
-|---------|--------------|
-| `src/components/BookingModal.tsx` | Ajouter `if (await isElite(playerId)) return 999;` dans `getMaxReservations` |
+### Resume des regles apres modification
+
+| Role | Terrains | Reservations actives | Horizon de dates |
+|------|----------|---------------------|------------------|
+| Joueur | Tous | 1 | Illimite |
+| Elite | Tous | Illimite (2h/jour) | J+2 |
+| Coach | 5,6,7,8,9,Central | 2 | J+1 |
+| **Super Coach** | Tous | 4 | **Illimite** (modifie) |
+| Admin | Tous | Illimite | Illimite |
 
 ### Impact
-- Camil et les autres joueurs Elite pourront créer des réservations
-- Ils resteront limités à 2h par jour grâce à `checkEliteDailyLimit`
-- Ils resteront limités à l'horizon J+2 grâce à `checkPlayerDateRestriction`
+- Les super coaches pourront reserver pour n'importe quelle date future
+- Les coaches restent limites a J/J+1
+- Aucun impact sur les autres roles
 
