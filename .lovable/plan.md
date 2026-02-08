@@ -1,89 +1,110 @@
 
-
-## Corriger le bypass de limite de reservation quand un entraineur est implique
+## Corriger le trigger de restriction de date pour exclure les Super Coaches
 
 ### Probleme identifie
 
-Dans `BookingModal.tsx` (lignes 475-493), la verification de limite pour **player2** ne tient pas compte du fait que **player1** pourrait etre un entraineur.
+Le trigger de base de donnees `validate_coach_date_restriction` applique incorrectement la restriction J+1 aux **Super Coaches**, alors que cette restriction ne devrait s'appliquer qu'aux **Coaches normaux**.
 
-**Code actuel :**
-```text
-// Lignes 459-462: On verifie si player2 est entraineur pour ignorer la limite de player1
-const player2IsCoach = await isCoach(player2Id);
-const player2IsSuperCoach = await isSuperCoach(player2Id);
-const partnerIsInstructor = player2IsCoach || player2IsSuperCoach;
-
-// Ligne 465: On bypass la limite de player1 si le partenaire est entraineur
-if (!partnerIsInstructor && player1ActiveCount >= player1MaxRes) { ... }
-
-// Lignes 485-493: On verifie la limite de player2 SANS verifier si player1 est entraineur!
-if (player2ActiveCount >= player2MaxRes) { ... }  // <-- BUG ICI
+**Code actuel du trigger :**
+```sql
+SELECT EXISTS (
+  SELECT 1 FROM user_roles 
+  WHERE user_id = NEW.player1_id 
+  AND role IN ('coach', 'super_coach')  -- ERREUR: inclut super_coach!
+) INTO player1_is_coach;
 ```
 
-**Scenario qui echoue :**
-- Player1 = Dislam (super_coach)
-- Player2 = Bennani Younes (joueur avec 1 reservation active)
-- Resultat : Erreur "Le joueur 2 a atteint sa limite de 1 reservation(s)"
-- Attendu : La limite devrait etre ignoree car player1 est entraineur
+**Regle metier correcte :**
+| Role | Restriction de date |
+|------|---------------------|
+| Coach | J+1 (aujourd'hui ou demain) |
+| Super Coach | Aucune (peut reserver n'importe quand) |
 
 ### Solution
 
-Ajouter une verification symetrique : si **player1** est un entraineur, on ignore la limite de **player2**.
+Modifier le trigger pour verifier uniquement le role `'coach'` et exclure `'super_coach'`.
 
 ### Modification a apporter
 
-**Fichier** : `src/components/BookingModal.tsx`
+**Migration SQL** - Mettre a jour la fonction `validate_coach_date_restriction` :
 
-**Lignes 459-493** - Ajouter la verification inverse :
-
-```text
-Avant :
-  // Verifier si le partenaire est un entraineur (coach ou super_coach)
-  const player2IsCoach = await isCoach(player2Id);
-  const player2IsSuperCoach = await isSuperCoach(player2Id);
-  const partnerIsInstructor = player2IsCoach || player2IsSuperCoach;
-
-  // Si le partenaire est un entraineur, on ignore la limite du joueur 1
-  if (!partnerIsInstructor && player1ActiveCount >= player1MaxRes) { ... }
-
-  // Check player 2 reservation limit
-  ...
-  if (player2ActiveCount >= player2MaxRes) { ... }  // <-- Pas de bypass!
-
-Apres :
-  // Verifier si player2 est un entraineur (pour ignorer limite player1)
-  const player2IsCoach = await isCoach(player2Id);
-  const player2IsSuperCoach = await isSuperCoach(player2Id);
-  const player2IsInstructor = player2IsCoach || player2IsSuperCoach;
-
-  // Verifier si player1 est un entraineur (pour ignorer limite player2)
-  const player1IsCoach = await isCoach(player1Id);
-  const player1IsSuperCoach = await isSuperCoach(player1Id);
-  const player1IsInstructor = player1IsCoach || player1IsSuperCoach;
-
-  // Si le partenaire (player2) est un entraineur, on ignore la limite du joueur 1
-  if (!player2IsInstructor && player1ActiveCount >= player1MaxRes) { ... }
-
-  // Check player 2 reservation limit
-  ...
-  // Si player1 est un entraineur, on ignore la limite du joueur 2
-  if (!player1IsInstructor && player2ActiveCount >= player2MaxRes) { ... }
+```sql
+CREATE OR REPLACE FUNCTION public.validate_coach_date_restriction()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public'
+AS $function$
+DECLARE
+  player1_is_coach_only BOOLEAN;
+  player2_is_coach_only BOOLEAN;
+  player1_is_super_coach BOOLEAN;
+  player2_is_super_coach BOOLEAN;
+  max_allowed_date DATE;
+BEGIN
+  max_allowed_date := CURRENT_DATE + INTERVAL '1 day';
+  
+  -- Verifier si player1 est un coach (pas super_coach)
+  SELECT EXISTS (
+    SELECT 1 FROM user_roles 
+    WHERE user_id = NEW.player1_id 
+    AND role = 'coach'
+  ) INTO player1_is_coach_only;
+  
+  -- Verifier si player1 est un super_coach
+  SELECT EXISTS (
+    SELECT 1 FROM user_roles 
+    WHERE user_id = NEW.player1_id 
+    AND role = 'super_coach'
+  ) INTO player1_is_super_coach;
+  
+  -- Verifier si player2 est un coach (pas super_coach)
+  SELECT EXISTS (
+    SELECT 1 FROM user_roles 
+    WHERE user_id = NEW.player2_id 
+    AND role = 'coach'
+  ) INTO player2_is_coach_only;
+  
+  -- Verifier si player2 est un super_coach
+  SELECT EXISTS (
+    SELECT 1 FROM user_roles 
+    WHERE user_id = NEW.player2_id 
+    AND role = 'super_coach'
+  ) INTO player2_is_super_coach;
+  
+  -- Appliquer la restriction seulement si un joueur est COACH (pas super_coach)
+  -- ET que le partenaire n'est pas un entraineur (bypass symetrique)
+  -- Coach seul sans entraineur en face = restriction J+1
+  IF NEW.date > max_allowed_date THEN
+    -- Si player1 est coach simple (pas super) et player2 n'est pas entraineur
+    IF player1_is_coach_only AND NOT player1_is_super_coach 
+       AND NOT player2_is_coach_only AND NOT player2_is_super_coach THEN
+      RAISE EXCEPTION 'Les reservations avec un coach ne sont possibles que pour aujourd''hui ou demain';
+    END IF;
+    
+    -- Si player2 est coach simple (pas super) et player1 n'est pas entraineur
+    IF player2_is_coach_only AND NOT player2_is_super_coach 
+       AND NOT player1_is_coach_only AND NOT player1_is_super_coach THEN
+      RAISE EXCEPTION 'Les reservations avec un coach ne sont possibles que pour aujourd''hui ou demain';
+    END IF;
+  END IF;
+  
+  RETURN NEW;
+END;
+$function$;
 ```
 
-### Logique metier clarifiee
+### Rappel des regles de date par role
 
-| Situation | Player 1 | Player 2 | Limite appliquee |
-|-----------|----------|----------|------------------|
-| Joueur avec joueur | joueur | joueur | Limite des 2 joueurs |
-| Joueur avec coach | joueur | coach | Aucune limite (bypass pour joueur) |
-| Coach avec joueur | coach | joueur | Aucune limite (bypass pour joueur) |
-| Joueur avec super_coach | joueur | super_coach | Aucune limite (bypass pour joueur) |
-| Super_coach avec joueur | super_coach | joueur | Aucune limite (bypass pour joueur) |
-| Coach avec coach | coach | coach | Limites des 2 coachs (2 chacun) |
+| Role | Horizon de reservation | Notes |
+|------|------------------------|-------|
+| Joueur | Illimite | Peut reserver n'importe quand |
+| Elite | J+2 | Maximum apres-demain |
+| Coach | J+1 | Maximum demain |
+| Super Coach | Illimite | Peut reserver n'importe quand |
+| Admin | Illimite | Peut creer des reservations pour n'importe quelle date |
 
-### Resume
-
-- Si un des deux joueurs est entraineur (coach ou super_coach), la limite de l'autre joueur est ignoree
-- Les limites propres aux entraineurs (2 pour coach, 4 pour super_coach) restent applicables entre eux
-- Cette modification corrigera le cas Dislam (super_coach) + Bennani (joueur)
-
+### Impact
+- DISLAM (super_coach) pourra reserver pour n'importe quelle date
+- Les coachs normaux restent limites a J+1
+- La logique symetrique est respectee : un joueur avec un coach = restriction J+1 pour le coach, pas pour le joueur
