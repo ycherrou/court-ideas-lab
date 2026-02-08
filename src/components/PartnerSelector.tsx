@@ -139,7 +139,8 @@ export function PartnerSelector({
 
         recentReservations.forEach((r) => {
           const partnerId = r.player1_id === userId ? r.player2_id : r.player1_id;
-          if (!recentIds.has(partnerId)) {
+          // Ne pas inclure les admins dans les récents
+          if (!recentIds.has(partnerId) && !adminIds.includes(partnerId)) {
             recentIds.add(partnerId);
             const partner = profiles.find((p) => p.id === partnerId);
             if (partner) {
