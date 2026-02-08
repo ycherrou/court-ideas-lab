@@ -456,13 +456,18 @@ export const BookingModal = ({
 
       const player1ActiveCount = player1ActiveRes ? countActiveReservations(player1ActiveRes, todayStr, currentTime) : 0;
 
-      // Vérifier si le partenaire est un entraîneur (coach ou super_coach)
+      // Vérifier si player2 est un entraîneur (pour ignorer limite player1)
       const player2IsCoach = await isCoach(player2Id);
       const player2IsSuperCoach = await isSuperCoach(player2Id);
-      const partnerIsInstructor = player2IsCoach || player2IsSuperCoach;
+      const player2IsInstructor = player2IsCoach || player2IsSuperCoach;
 
-      // Si le partenaire est un entraîneur, on ignore la limite du joueur 1
-      if (!partnerIsInstructor && player1ActiveCount >= player1MaxRes) {
+      // Vérifier si player1 est un entraîneur (pour ignorer limite player2)
+      const player1IsCoach = await isCoach(player1Id);
+      const player1IsSuperCoach = await isSuperCoach(player1Id);
+      const player1IsInstructor = player1IsCoach || player1IsSuperCoach;
+
+      // Si player2 est un entraîneur, on ignore la limite du joueur 1
+      if (!player2IsInstructor && player1ActiveCount >= player1MaxRes) {
         const roleLabel = player1MaxRes === 4 ? "super coach" : player1MaxRes === 2 ? "coach" : "joueur";
         toast.error(isAdmin 
           ? `Le joueur 1 a atteint sa limite de ${player1MaxRes} réservation(s) (${roleLabel})`
@@ -482,7 +487,8 @@ export const BookingModal = ({
 
       const player2ActiveCount = player2ActiveRes ? countActiveReservations(player2ActiveRes, todayStr, currentTime) : 0;
 
-      if (player2ActiveCount >= player2MaxRes) {
+      // Si player1 est un entraîneur, on ignore la limite du joueur 2
+      if (!player1IsInstructor && player2ActiveCount >= player2MaxRes) {
         const roleLabel = player2MaxRes === 4 ? "super coach" : player2MaxRes === 2 ? "coach" : "joueur";
         toast.error(isAdmin 
           ? `Le joueur 2 a atteint sa limite de ${player2MaxRes} réservation(s) (${roleLabel})`
