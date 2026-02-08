@@ -1,114 +1,89 @@
 
 
-## Bloquer les administrateurs dans les réservations
+## Corriger le bypass de limite de reservation quand un entraineur est implique
 
-### Problème identifié
+### Probleme identifie
 
-En analysant la base de données, j'ai trouvé une réservation existante :
-- **Joueur 1** : TIFNOUTI REDOUANE (joueur)
-- **Joueur 2** : Administrateur (admin)
-- **Date** : 2026-02-07
+Dans `BookingModal.tsx` (lignes 475-493), la verification de limite pour **player2** ne tient pas compte du fait que **player1** pourrait etre un entraineur.
 
-Le code dans `PartnerSelector.tsx` (lignes 91-117) exclut bien les admins de la liste, mais il y a une faille : les **réservations passées** avec un admin apparaissent dans la section "Récents" (lignes 129-152) et peuvent être sélectionnées de nouveau.
-
-### Solution en 3 niveaux
-
-#### 1. Corriger le filtrage des récents dans PartnerSelector.tsx
-
-**Fichier** : `src/components/PartnerSelector.tsx`
-
-**Lignes 136-152** - Filtrer les admins de la liste des partenaires récents :
-
+**Code actuel :**
 ```text
-Avant :
-  recentReservations.forEach((r) => {
-    const partnerId = r.player1_id === userId ? r.player2_id : r.player1_id;
-    if (!recentIds.has(partnerId)) {
-      recentIds.add(partnerId);
-      const partner = profiles.find((p) => p.id === partnerId);
-      if (partner) {
-        recentPartnersList.push(partner);
-      }
-    }
-  });
+// Lignes 459-462: On verifie si player2 est entraineur pour ignorer la limite de player1
+const player2IsCoach = await isCoach(player2Id);
+const player2IsSuperCoach = await isSuperCoach(player2Id);
+const partnerIsInstructor = player2IsCoach || player2IsSuperCoach;
 
-Après :
-  recentReservations.forEach((r) => {
-    const partnerId = r.player1_id === userId ? r.player2_id : r.player1_id;
-    // Ne pas inclure les admins dans les récents
-    if (!recentIds.has(partnerId) && !adminIds.includes(partnerId)) {
-      recentIds.add(partnerId);
-      const partner = profiles.find((p) => p.id === partnerId);
-      if (partner) {
-        recentPartnersList.push(partner);
-      }
-    }
-  });
+// Ligne 465: On bypass la limite de player1 si le partenaire est entraineur
+if (!partnerIsInstructor && player1ActiveCount >= player1MaxRes) { ... }
+
+// Lignes 485-493: On verifie la limite de player2 SANS verifier si player1 est entraineur!
+if (player2ActiveCount >= player2MaxRes) { ... }  // <-- BUG ICI
 ```
 
-#### 2. Ajouter une validation dans BookingModal.tsx
+**Scenario qui echoue :**
+- Player1 = Dislam (super_coach)
+- Player2 = Bennani Younes (joueur avec 1 reservation active)
+- Resultat : Erreur "Le joueur 2 a atteint sa limite de 1 reservation(s)"
+- Attendu : La limite devrait etre ignoree car player1 est entraineur
+
+### Solution
+
+Ajouter une verification symetrique : si **player1** est un entraineur, on ignore la limite de **player2**.
+
+### Modification a apporter
 
 **Fichier** : `src/components/BookingModal.tsx`
 
-Ajouter une fonction de vérification et un blocage dans `handleConfirm` :
+**Lignes 459-493** - Ajouter la verification inverse :
 
 ```text
-// Nouvelle fonction après isElite (ligne 107)
-const isAdminPlayer = async (playerId: string): Promise<boolean> => {
-  const { data } = await supabase
-    .from("user_roles")
-    .select("role")
-    .eq("user_id", playerId)
-    .eq("role", "admin")
-    .maybeSingle();
-  
-  return !!data;
-};
+Avant :
+  // Verifier si le partenaire est un entraineur (coach ou super_coach)
+  const player2IsCoach = await isCoach(player2Id);
+  const player2IsSuperCoach = await isSuperCoach(player2Id);
+  const partnerIsInstructor = player2IsCoach || player2IsSuperCoach;
 
-// Dans handleConfirm, après la vérification de date (vers ligne 350)
-const [player1IsAdmin, player2IsAdmin] = await Promise.all([
-  isAdminPlayer(player1Id),
-  isAdminPlayer(player2Id),
-]);
+  // Si le partenaire est un entraineur, on ignore la limite du joueur 1
+  if (!partnerIsInstructor && player1ActiveCount >= player1MaxRes) { ... }
 
-if (player1IsAdmin || player2IsAdmin) {
-  toast.error("Les administrateurs ne peuvent pas participer aux réservations");
-  setLoading(false);
-  return;
-}
+  // Check player 2 reservation limit
+  ...
+  if (player2ActiveCount >= player2MaxRes) { ... }  // <-- Pas de bypass!
+
+Apres :
+  // Verifier si player2 est un entraineur (pour ignorer limite player1)
+  const player2IsCoach = await isCoach(player2Id);
+  const player2IsSuperCoach = await isSuperCoach(player2Id);
+  const player2IsInstructor = player2IsCoach || player2IsSuperCoach;
+
+  // Verifier si player1 est un entraineur (pour ignorer limite player2)
+  const player1IsCoach = await isCoach(player1Id);
+  const player1IsSuperCoach = await isSuperCoach(player1Id);
+  const player1IsInstructor = player1IsCoach || player1IsSuperCoach;
+
+  // Si le partenaire (player2) est un entraineur, on ignore la limite du joueur 1
+  if (!player2IsInstructor && player1ActiveCount >= player1MaxRes) { ... }
+
+  // Check player 2 reservation limit
+  ...
+  // Si player1 est un entraineur, on ignore la limite du joueur 2
+  if (!player1IsInstructor && player2ActiveCount >= player2MaxRes) { ... }
 ```
 
-#### 3. Ajouter un trigger de validation en base de données
+### Logique metier clarifiee
 
-**Migration SQL** - Créer un trigger qui bloque les réservations avec un admin :
+| Situation | Player 1 | Player 2 | Limite appliquee |
+|-----------|----------|----------|------------------|
+| Joueur avec joueur | joueur | joueur | Limite des 2 joueurs |
+| Joueur avec coach | joueur | coach | Aucune limite (bypass pour joueur) |
+| Coach avec joueur | coach | joueur | Aucune limite (bypass pour joueur) |
+| Joueur avec super_coach | joueur | super_coach | Aucune limite (bypass pour joueur) |
+| Super_coach avec joueur | super_coach | joueur | Aucune limite (bypass pour joueur) |
+| Coach avec coach | coach | coach | Limites des 2 coachs (2 chacun) |
 
-```sql
-CREATE OR REPLACE FUNCTION validate_no_admin_in_reservation()
-RETURNS TRIGGER AS $$
-BEGIN
-  IF has_role(NEW.player1_id, 'admin') OR has_role(NEW.player2_id, 'admin') THEN
-    RAISE EXCEPTION 'Les administrateurs ne peuvent pas participer aux reservations';
-  END IF;
-  RETURN NEW;
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+### Resume
 
-CREATE TRIGGER check_no_admin_in_reservation
-BEFORE INSERT ON public.reservations
-FOR EACH ROW
-EXECUTE FUNCTION validate_no_admin_in_reservation();
-```
-
-### Résumé des modifications
-
-| Niveau | Fichier/Ressource | Modification |
-|--------|-------------------|--------------|
-| Frontend | `PartnerSelector.tsx` | Exclure admins de la section "Récents" |
-| Frontend | `BookingModal.tsx` | Bloquer si player1 ou player2 est admin |
-| Base de données | Trigger SQL | Bloquer l'insertion si admin impliqué |
-
-### Impact
-- Aucun administrateur ne pourra être sélectionné comme joueur ou partenaire
-- Les réservations existantes avec un admin resteront visibles mais aucune nouvelle ne pourra être créée
-- Protection à 3 niveaux : UI (liste), validation (code), contrainte (BDD)
+- Si un des deux joueurs est entraineur (coach ou super_coach), la limite de l'autre joueur est ignoree
+- Les limites propres aux entraineurs (2 pour coach, 4 pour super_coach) restent applicables entre eux
+- Cette modification corrigera le cas Dislam (super_coach) + Bennani (joueur)
 
