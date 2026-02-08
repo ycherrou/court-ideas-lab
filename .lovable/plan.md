@@ -1,84 +1,114 @@
 
 
-## Corriger la restriction de date J+1 pour les reservations avec un entraineur
+## Bloquer les administrateurs dans les réservations
 
-### Probleme identifie
-Dans `BookingModal.tsx` (lignes 326-341), la fonction `checkPlayerDateRestriction` est appelee pour les deux joueurs. Quand le partenaire (player2) est un coach, cette verification bloque la reservation avec l'erreur "Les reservations avec un coach ne sont possibles que pour aujourd'hui ou demain".
+### Problème identifié
 
-Cette logique est incorrecte : la restriction J+1 devrait s'appliquer uniquement quand le coach lui-meme fait la reservation, pas quand un joueur reserve une session avec un coach.
+En analysant la base de données, j'ai trouvé une réservation existante :
+- **Joueur 1** : TIFNOUTI REDOUANE (joueur)
+- **Joueur 2** : Administrateur (admin)
+- **Date** : 2026-02-07
 
-### Solution
-Modifier la logique pour que la restriction de date du partenaire (player2) ne s'applique pas s'il est entraineur.
+Le code dans `PartnerSelector.tsx` (lignes 91-117) exclut bien les admins de la liste, mais il y a une faille : les **réservations passées** avec un admin apparaissent dans la section "Récents" (lignes 129-152) et peuvent être sélectionnées de nouveau.
 
-### Modification a apporter
+### Solution en 3 niveaux
 
-**Fichier** : `src/components/BookingModal.tsx`
+#### 1. Corriger le filtrage des récents dans PartnerSelector.tsx
 
-**Lignes 322-341** - Ajouter une verification du role du partenaire avant d'appliquer sa restriction de date :
+**Fichier** : `src/components/PartnerSelector.tsx`
+
+**Lignes 136-152** - Filtrer les admins de la liste des partenaires récents :
 
 ```text
 Avant :
-  const [player1DateCheck, player2DateCheck] = await Promise.all([
-    checkPlayerDateRestriction(player1Id),
-    checkPlayerDateRestriction(player2Id),
-  ]);
-
-  if (!player1DateCheck.ok) { ... }
-  if (!player2DateCheck.ok) { ... }
-
-Apres :
-  // Verifier si le partenaire est un entraineur
-  const [player2IsCoach, player2IsSuperCoach] = await Promise.all([
-    isCoach(player2Id),
-    isSuperCoach(player2Id),
-  ]);
-  const partnerIsInstructor = player2IsCoach || player2IsSuperCoach;
-
-  // Toujours verifier la restriction du joueur 1 (celui qui reserve)
-  const player1DateCheck = await checkPlayerDateRestriction(player1Id);
-  if (!player1DateCheck.ok) {
-    toast.error(player1DateCheck.message);
-    setLoading(false);
-    return;
-  }
-
-  // Ne pas appliquer la restriction de date si le partenaire est un entraineur
-  // (le joueur peut reserver avec un coach pour n'importe quelle date)
-  if (!partnerIsInstructor) {
-    const player2DateCheck = await checkPlayerDateRestriction(player2Id);
-    if (!player2DateCheck.ok) {
-      toast.error(player2DateCheck.message);
-      setLoading(false);
-      return;
+  recentReservations.forEach((r) => {
+    const partnerId = r.player1_id === userId ? r.player2_id : r.player1_id;
+    if (!recentIds.has(partnerId)) {
+      recentIds.add(partnerId);
+      const partner = profiles.find((p) => p.id === partnerId);
+      if (partner) {
+        recentPartnersList.push(partner);
+      }
     }
-  }
+  });
+
+Après :
+  recentReservations.forEach((r) => {
+    const partnerId = r.player1_id === userId ? r.player2_id : r.player1_id;
+    // Ne pas inclure les admins dans les récents
+    if (!recentIds.has(partnerId) && !adminIds.includes(partnerId)) {
+      recentIds.add(partnerId);
+      const partner = profiles.find((p) => p.id === partnerId);
+      if (partner) {
+        recentPartnersList.push(partner);
+      }
+    }
+  });
 ```
 
-### Logique metier clarifiee
+#### 2. Ajouter une validation dans BookingModal.tsx
 
-| Qui reserve | Avec qui | Restriction de date appliquee |
-|-------------|----------|-------------------------------|
-| Joueur | Joueur | Aucune (joueurs sans restriction) |
-| Joueur | Coach | Aucune (on ignore la restriction J+1 du coach) |
-| Joueur | Super Coach | Aucune (super coach sans restriction) |
-| Coach | Joueur | J+1 (restriction du coach qui reserve) |
-| Coach | Coach | J+1 (restriction du coach qui reserve) |
-| Super Coach | Joueur | Aucune |
-| Elite | Joueur | J+2 |
-| Elite | Coach | J+2 (restriction Elite s'applique toujours) |
+**Fichier** : `src/components/BookingModal.tsx`
 
-### Rappel des regles completes par role
+Ajouter une fonction de vérification et un blocage dans `handleConfirm` :
 
-| Role | Terrains | Limite reservations | Horizon de date |
-|------|----------|---------------------|-----------------|
-| Joueur | Tous | 1 active (bypass si avec entraineur) | Illimite |
-| Elite | Tous | 2h/jour max | J+2 |
-| Coach | 5, 6, 7, 8, 9, Central | 2 actives | J+1 |
-| Super Coach | Tous | 4 actives | Illimite |
-| Admin | Tous | Illimite | Illimite |
+```text
+// Nouvelle fonction après isElite (ligne 107)
+const isAdminPlayer = async (playerId: string): Promise<boolean> => {
+  const { data } = await supabase
+    .from("user_roles")
+    .select("role")
+    .eq("user_id", playerId)
+    .eq("role", "admin")
+    .maybeSingle();
+  
+  return !!data;
+};
+
+// Dans handleConfirm, après la vérification de date (vers ligne 350)
+const [player1IsAdmin, player2IsAdmin] = await Promise.all([
+  isAdminPlayer(player1Id),
+  isAdminPlayer(player2Id),
+]);
+
+if (player1IsAdmin || player2IsAdmin) {
+  toast.error("Les administrateurs ne peuvent pas participer aux réservations");
+  setLoading(false);
+  return;
+}
+```
+
+#### 3. Ajouter un trigger de validation en base de données
+
+**Migration SQL** - Créer un trigger qui bloque les réservations avec un admin :
+
+```sql
+CREATE OR REPLACE FUNCTION validate_no_admin_in_reservation()
+RETURNS TRIGGER AS $$
+BEGIN
+  IF has_role(NEW.player1_id, 'admin') OR has_role(NEW.player2_id, 'admin') THEN
+    RAISE EXCEPTION 'Les administrateurs ne peuvent pas participer aux reservations';
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+CREATE TRIGGER check_no_admin_in_reservation
+BEFORE INSERT ON public.reservations
+FOR EACH ROW
+EXECUTE FUNCTION validate_no_admin_in_reservation();
+```
+
+### Résumé des modifications
+
+| Niveau | Fichier/Ressource | Modification |
+|--------|-------------------|--------------|
+| Frontend | `PartnerSelector.tsx` | Exclure admins de la section "Récents" |
+| Frontend | `BookingModal.tsx` | Bloquer si player1 ou player2 est admin |
+| Base de données | Trigger SQL | Bloquer l'insertion si admin impliqué |
 
 ### Impact
-- Un joueur pourra reserver avec un coach pour n'importe quelle date future
-- Le coach qui fait lui-meme une reservation reste limite a J+1
-- Les autres restrictions (limites de reservations, terrains) restent inchangees
+- Aucun administrateur ne pourra être sélectionné comme joueur ou partenaire
+- Les réservations existantes avec un admin resteront visibles mais aucune nouvelle ne pourra être créée
+- Protection à 3 niveaux : UI (liste), validation (code), contrainte (BDD)
 
