@@ -106,6 +106,18 @@ export const BookingModal = ({
     return !!data;
   };
 
+  // Helper function to check if a user is admin
+  const isAdminPlayer = async (playerId: string): Promise<boolean> => {
+    const { data } = await supabase
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", playerId)
+      .eq("role", "admin")
+      .maybeSingle();
+    
+    return !!data;
+  };
+
   // Helper function to count active reservations
   const countActiveReservations = (reservations: any[], todayStr: string, currentTime: string): number => {
     return reservations.filter((res) => {
@@ -324,10 +336,20 @@ export const BookingModal = ({
     const player2Id = isAdmin ? selectedPlayer2 : selectedPartner;
 
     // Vérifier si le partenaire est un entraîneur (pour ignorer sa restriction de date)
-    const [player2IsCoachForDate, player2IsSuperCoachForDate] = await Promise.all([
+    const [player2IsCoachForDate, player2IsSuperCoachForDate, player1IsAdmin, player2IsAdmin] = await Promise.all([
       isCoach(player2Id),
       isSuperCoach(player2Id),
+      isAdminPlayer(player1Id),
+      isAdminPlayer(player2Id),
     ]);
+
+    // Bloquer si un des joueurs est admin
+    if (player1IsAdmin || player2IsAdmin) {
+      toast.error("Les administrateurs ne peuvent pas participer aux réservations");
+      setLoading(false);
+      return;
+    }
+
     const partnerIsInstructorForDate = player2IsCoachForDate || player2IsSuperCoachForDate;
 
     // Toujours vérifier la restriction du joueur 1 (celui qui réserve)
