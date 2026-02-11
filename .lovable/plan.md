@@ -1,66 +1,90 @@
 
 
-## Supprimer toutes les restrictions d'horizon de reservation
+## Ajouter une page de configuration des regles de reservation
 
 ### Objectif
-Rendre l'horizon de reservation illimite pour **tous les profils** (Joueur, Elite, Coach, Super Coach, Admin).
+Permettre a l'administrateur de modifier les regles de reservation (quotas, terrains, restrictions) depuis l'interface, sans intervention technique.
 
-### Modifications necessaires
+### 1. Nouvelle table `reservation_settings`
 
-#### 1. Base de donnees - Desactiver le trigger de restriction Coach (J+1)
+Stocker les regles configurables par role dans une table dediee :
 
-Remplacer la fonction `validate_coach_date_restriction` par une version qui ne bloque plus rien :
-
-```sql
-CREATE OR REPLACE FUNCTION public.validate_coach_date_restriction()
-RETURNS trigger
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path TO 'public'
-AS $function$
-BEGIN
-  -- Plus aucune restriction de date pour les coachs
-  RETURN NEW;
-END;
-$function$;
+```text
+reservation_settings
++------------------+----------+---------+
+| role             | app_role | PK      |
+| max_active       | integer  | nullable|
+| max_hours_per_day| integer  | nullable|
+| allowed_courts   | text[]   | nullable|
+| can_create       | boolean  | default true |
++------------------+----------+---------+
 ```
 
-#### 2. Base de donnees - Desactiver la restriction Elite (J+2) dans le trigger
+- `role` : cle primaire, une ligne par role (player, elite, coach, super_coach, admin)
+- `max_active` : nombre max de reservations actives (null = illimite)
+- `max_hours_per_day` : limite d'heures par jour (null = illimite, ex: 2 pour elite)
+- `allowed_courts` : liste de numeros de terrain autorises (null = tous)
+- `can_create` : si le role peut creer des reservations (false pour coach actuellement)
 
-Modifier la fonction `validate_elite_restrictions` pour supprimer la verification de date (tout en conservant la limite de 2h par jour pour les Elite) :
+Donnees initiales basees sur les regles actuelles :
 
-```sql
-CREATE OR REPLACE FUNCTION public.validate_elite_restrictions()
-RETURNS trigger ...
--- Supprimer le bloc qui verifie max_allowed_date
--- Conserver le bloc qui verifie les heures quotidiennes (2h/jour)
-```
+| Role | max_active | max_hours_per_day | allowed_courts | can_create |
+|------|-----------|-------------------|----------------|------------|
+| player | 1 | null | null (tous) | true |
+| elite | null | 2 | null (tous) | true |
+| coach | 2 | null | {5,6,7,8,9,10} | false |
+| super_coach | 4 | null | null (tous) | true |
+| admin | null | null | null (tous) | true |
 
-#### 3. Frontend - BookingModal.tsx
+(10 = terrain central, on utilisera les court_number)
 
-Modifier la fonction `checkPlayerDateRestriction` (lignes 268-297) pour ne plus bloquer sur les dates :
-- Supprimer la condition pour `elite` (J+2)
-- Supprimer la condition pour `coach` (J+1)
-- La fonction retournera toujours `{ ok: true }`
+### 2. Politiques RLS
 
-#### 4. Frontend - useCoachRestrictions.tsx (aucune modification)
+- SELECT : accessible a tous les utilisateurs authentifies (les regles doivent etre lisibles pour le frontend)
+- UPDATE/INSERT/DELETE : uniquement pour les admins
 
-Ce hook gere les restrictions de **terrains**, pas de dates. Il reste inchange.
+### 3. Nouvel onglet "Regles" dans la page Admin
 
-### Resume des changements
+Un nouvel onglet dans la page Admin existante avec :
+- Un tableau listant les 5 roles avec leurs regles editables
+- Pour chaque role, des champs modifiables :
+  - Quota de reservations actives (nombre ou "Illimite")
+  - Limite d'heures par jour (nombre ou "Illimite")
+  - Terrains autorises (selection multiple des terrains)
+  - Peut creer des reservations (oui/non)
+- Un bouton "Enregistrer" par ligne ou global
+- Log d'audit a chaque modification
 
-| Avant | Apres |
-|-------|-------|
-| Coach : J+1 | Coach : Illimite |
-| Elite : J+2 | Elite : Illimite |
-| Joueur : Illimite | Joueur : Illimite |
-| Super Coach : Illimite | Super Coach : Illimite |
-| Admin : Illimite | Admin : Illimite |
+### 4. Modification du BookingModal
 
-**Note** : La limite de 2 heures par jour pour les joueurs Elite est conservee (ce n'est pas un horizon de date mais un quota journalier).
+Remplacer les valeurs en dur par une lecture de la table `reservation_settings` :
+- `getMaxReservations()` : lire `max_active` depuis la table
+- Restrictions de terrains : lire `allowed_courts` depuis la table
+- Verification coach `can_create` : lire depuis la table
 
-### Fichiers modifies
+### 5. Modification des triggers de base de donnees
 
-1. **Migration SQL** : nouvelle migration pour mettre a jour les 2 fonctions de trigger
-2. **src/components/BookingModal.tsx** : simplifier `checkPlayerDateRestriction` pour toujours retourner ok
+Mettre a jour les fonctions de trigger pour lire depuis `reservation_settings` :
+- `validate_elite_restrictions()` : lire `max_hours_per_day` depuis la table
+- `validate_coach_court_restriction()` : lire `allowed_courts` depuis la table
+- `is_court_allowed_for_user()` : lire les terrains depuis la table
+
+### 6. Modification du hook `useCoachRestrictions`
+
+Adapter le hook pour lire les restrictions de terrains depuis `reservation_settings` au lieu de les coder en dur.
+
+### Fichiers concernes
+
+1. **Nouvelle migration SQL** : creation de la table, donnees initiales, RLS, mise a jour des triggers
+2. **src/pages/Admin.tsx** : ajout de l'onglet "Regles"
+3. **src/components/BookingModal.tsx** : lecture des regles depuis la table
+4. **src/hooks/useCoachRestrictions.tsx** : lecture des terrains autorises depuis la table
+5. **src/hooks/useReservationSettings.tsx** (nouveau) : hook pour charger les regles de reservation
+
+### Avantages
+
+- L'admin peut modifier les quotas et restrictions sans demander de changement technique
+- Toutes les regles sont centralisees dans une seule table
+- Les triggers de base de donnees lisent aussi cette table, garantissant la coherence
+- Chaque modification est tracee dans le journal d'audit
 
