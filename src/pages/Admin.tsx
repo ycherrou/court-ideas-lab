@@ -18,6 +18,7 @@ import { BulkImportModal } from "@/components/BulkImportModal";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AuditLogViewer } from "@/components/AuditLogViewer";
+import { ReservationSettingsTab } from "@/components/ReservationSettingsTab";
 import { z } from "zod";
 
 const newMemberSchema = z.object({
@@ -654,10 +655,11 @@ const Admin = () => {
 
         <main className="container mx-auto px-4 py-8">
           <Tabs defaultValue="members">
-            <TabsList className="grid w-full grid-cols-4 max-w-lg">
+            <TabsList className="grid w-full grid-cols-5 max-w-2xl">
               <TabsTrigger value="members">Membres</TabsTrigger>
               <TabsTrigger value="reservations">Réservations</TabsTrigger>
               <TabsTrigger value="blocked">Blocages</TabsTrigger>
+              <TabsTrigger value="settings">Règles</TabsTrigger>
               <TabsTrigger value="history">
                 <History className="h-4 w-4 mr-1" />
                 Historique
@@ -1140,6 +1142,14 @@ const Admin = () => {
           </Card>
         </div>
       </TabsContent>
+
+          <TabsContent value="settings" className="mt-6">
+            <ReservationSettingsTab 
+              courts={courts} 
+              userId={user?.id} 
+              userProfile={userProfile} 
+            />
+          </TabsContent>
 
           <TabsContent value="history" className="mt-6">
             <AuditLogViewer />

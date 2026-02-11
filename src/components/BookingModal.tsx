@@ -129,21 +129,57 @@ export const BookingModal = ({
 
   // Helper function to get max reservations based on role
   const getMaxReservations = async (playerId: string): Promise<number> => {
-    if (await isSuperCoach(playerId)) return 4;
-    if (await isCoach(playerId)) return 2;
-    if (await isElite(playerId)) return 999; // Pas de limite globale, seule la limite quotidienne s'applique
-    return 1;
+    // Get highest priority role
+    const { data: roles } = await supabase
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", playerId);
+    
+    const roleOrder = ["admin", "super_coach", "coach", "elite", "player"];
+    const primaryRole = roles
+      ?.map((r) => r.role)
+      .sort((a, b) => roleOrder.indexOf(a) - roleOrder.indexOf(b))[0] || "player";
+
+    // Read from reservation_settings
+    const { data: setting } = await supabase
+      .from("reservation_settings")
+      .select("max_active")
+      .eq("role", primaryRole)
+      .single();
+
+    return (setting as any)?.max_active ?? 999; // null = unlimited
   };
 
-  // Empêcher l'ouverture si l'utilisateur est un coach
+  // Empêcher l'ouverture si le rôle de l'utilisateur n'a pas can_create
   useEffect(() => {
-    if (open && currentUserIsCoach && !isAdmin) {
-      toast.error("Les coachs ne peuvent pas créer de réservations");
-      onOpenChange(false);
-    }
-  }, [open, currentUserIsCoach, isAdmin, onOpenChange]);
+    const checkCanCreate = async () => {
+      if (!open || !userId || isAdmin) return;
+      
+      const { data: roles } = await supabase
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", userId);
+      
+      const roleOrder = ["admin", "super_coach", "coach", "elite", "player"];
+      const primaryRole = roles
+        ?.map((r) => r.role)
+        .sort((a, b) => roleOrder.indexOf(a) - roleOrder.indexOf(b))[0] || "player";
 
-  // Charger les restrictions du partenaire sélectionné
+      const { data: setting } = await supabase
+        .from("reservation_settings")
+        .select("can_create")
+        .eq("role", primaryRole)
+        .single();
+
+      if (setting && !(setting as any).can_create) {
+        toast.error("Votre profil ne permet pas de créer des réservations");
+        onOpenChange(false);
+      }
+    };
+    checkCanCreate();
+  }, [open, userId, isAdmin, onOpenChange]);
+
+  // Charger les restrictions du partenaire sélectionné depuis reservation_settings
   useEffect(() => {
     const checkPartnerRestrictions = async () => {
       const partnerId = isAdmin ? (selectedPlayer1 || selectedPlayer2) : selectedPartner;
@@ -155,20 +191,34 @@ export const BookingModal = ({
       const { data: roles } = await supabase
         .from("user_roles")
         .select("role")
-        .eq("user_id", partnerId)
-        .in("role", ["coach", "super_coach"])
-        .maybeSingle();
+        .eq("user_id", partnerId);
 
-      if (roles?.role === "coach") {
-        // Coach normal : restreindre aux terrains 6,7,8,9,central
-        const { data: courts } = await supabase
+      const roleOrder = ["admin", "super_coach", "coach", "elite", "player"];
+      const primaryRole = roles
+        ?.map((r) => r.role)
+        .sort((a, b) => roleOrder.indexOf(a) - roleOrder.indexOf(b))[0] || "player";
+
+      const { data: setting } = await supabase
+        .from("reservation_settings")
+        .select("allowed_courts")
+        .eq("role", primaryRole)
+        .single();
+
+      const allowedCourts = (setting as any)?.allowed_courts as number[] | null;
+
+      if (allowedCourts && allowedCourts.length > 0) {
+        // Convert court numbers to court IDs
+        const { data: courtsData } = await supabase
           .from("courts")
-          .select("id")
-          .or("court_number.in.(6,7,8,9),is_central.eq.true");
+          .select("id, court_number, is_central");
 
-        setPartnerRestrictions(courts?.map((c) => c.id) || []);
+        const allowedIds = courtsData
+          ?.filter((c) => allowedCourts.includes(c.is_central ? 10 : c.court_number))
+          .map((c) => c.id) || [];
+
+        setPartnerRestrictions(allowedIds);
       } else {
-        setPartnerRestrictions([]); // Pas de restriction
+        setPartnerRestrictions([]); // No restriction
       }
     };
 
@@ -263,10 +313,27 @@ export const BookingModal = ({
     return { ok: true };
   };
 
-  // Vérifier la limite quotidienne de 2h pour les joueurs Elite
-  const checkEliteDailyLimit = async (playerId: string, dateStr: string): Promise<{ ok: boolean; message?: string }> => {
-    const isElitePlayer = await isElite(playerId);
-    if (!isElitePlayer) return { ok: true };
+  // Vérifier la limite quotidienne d'heures depuis reservation_settings
+  const checkDailyHoursLimit = async (playerId: string, dateStr: string): Promise<{ ok: boolean; message?: string }> => {
+    // Get primary role
+    const { data: roles } = await supabase
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", playerId);
+
+    const roleOrder = ["admin", "super_coach", "coach", "elite", "player"];
+    const primaryRole = roles
+      ?.map((r) => r.role)
+      .sort((a, b) => roleOrder.indexOf(a) - roleOrder.indexOf(b))[0] || "player";
+
+    const { data: setting } = await supabase
+      .from("reservation_settings")
+      .select("max_hours_per_day")
+      .eq("role", primaryRole)
+      .single();
+
+    const maxHours = (setting as any)?.max_hours_per_day as number | null;
+    if (!maxHours) return { ok: true }; // null = no limit
 
     const { data: reservations } = await supabase
       .from("reservations")
@@ -274,8 +341,8 @@ export const BookingModal = ({
       .eq("date", dateStr)
       .or(`player1_id.eq.${playerId},player2_id.eq.${playerId}`);
 
-    if ((reservations?.length || 0) >= 2) {
-      return { ok: false, message: "Limite de 2 heures par jour atteinte pour ce joueur Elite" };
+    if ((reservations?.length || 0) >= maxHours) {
+      return { ok: false, message: `Limite de ${maxHours} heure(s) par jour atteinte pour ce joueur` };
     }
     return { ok: true };
   };
@@ -344,25 +411,25 @@ export const BookingModal = ({
       const day = String(selectedDate.getDate()).padStart(2, '0');
       const dateStr = `${year}-${month}-${day}`;
 
-      // Vérifier la limite quotidienne Elite avant de créer la réservation
-      const [elite1Check, elite2Check] = await Promise.all([
-        checkEliteDailyLimit(player1Id, dateStr),
-        checkEliteDailyLimit(player2Id, dateStr),
+      // Vérifier la limite quotidienne d'heures avant de créer la réservation
+      const [hours1Check, hours2Check] = await Promise.all([
+        checkDailyHoursLimit(player1Id, dateStr),
+        checkDailyHoursLimit(player2Id, dateStr),
       ]);
 
-      if (!elite1Check.ok) {
+      if (!hours1Check.ok) {
         toast.error(isAdmin 
-          ? "Le joueur 1 (Elite) a atteint sa limite de 2h pour ce jour"
-          : "Vous avez atteint votre limite de 2 heures pour cette journée"
+          ? `Le joueur 1 : ${hours1Check.message}`
+          : hours1Check.message || "Limite d'heures atteinte"
         );
         setLoading(false);
         return;
       }
 
-      if (!elite2Check.ok) {
+      if (!hours2Check.ok) {
         toast.error(isAdmin 
-          ? "Le joueur 2 (Elite) a atteint sa limite de 2h pour ce jour"
-          : "Votre partenaire (Elite) a atteint sa limite de 2 heures pour cette journée"
+          ? `Le joueur 2 : ${hours2Check.message}`
+          : hours2Check.message || "Limite d'heures atteinte pour votre partenaire"
         );
         setLoading(false);
         return;

@@ -169,6 +169,30 @@ export type Database = {
         }
         Relationships: []
       }
+      reservation_settings: {
+        Row: {
+          allowed_courts: number[] | null
+          can_create: boolean
+          max_active: number | null
+          max_hours_per_day: number | null
+          role: Database["public"]["Enums"]["app_role"]
+        }
+        Insert: {
+          allowed_courts?: number[] | null
+          can_create?: boolean
+          max_active?: number | null
+          max_hours_per_day?: number | null
+          role: Database["public"]["Enums"]["app_role"]
+        }
+        Update: {
+          allowed_courts?: number[] | null
+          can_create?: boolean
+          max_active?: number | null
+          max_hours_per_day?: number | null
+          role?: Database["public"]["Enums"]["app_role"]
+        }
+        Relationships: []
+      }
       reservations: {
         Row: {
           court_id: string
