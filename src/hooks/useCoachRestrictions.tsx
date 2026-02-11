@@ -33,16 +33,38 @@ export const useCoachRestrictions = (userId: string | undefined) => {
       setIsSuperCoach(!!superCoachRole);
       setIsElite(!!eliteRole);
 
-      // Si coach (pas super coach), récupérer les terrains autorisés
-      if (coachRole && !superCoachRole) {
-        const { data: courts } = await supabase
-          .from("courts")
-          .select("id")
-          .or("court_number.in.(5,6,7,8,9),is_central.eq.true");
+      // Déterminer le rôle principal
+      const roleOrder = ["super_coach", "coach", "elite"];
+      const primaryRole = roles
+        ?.map((r) => r.role)
+        .sort((a, b) => roleOrder.indexOf(a) - roleOrder.indexOf(b))[0];
 
-        setAllowedCourtIds(courts?.map((c) => c.id) || []);
+      if (primaryRole) {
+        // Lire les terrains autorisés depuis reservation_settings
+        const { data: setting } = await supabase
+          .from("reservation_settings")
+          .select("allowed_courts")
+          .eq("role", primaryRole)
+          .single();
+
+        const allowedCourts = (setting as any)?.allowed_courts as number[] | null;
+
+        if (allowedCourts && allowedCourts.length > 0) {
+          // Convertir les numéros de terrain en IDs
+          const { data: courtsData } = await supabase
+            .from("courts")
+            .select("id, court_number, is_central");
+
+          const ids = courtsData
+            ?.filter((c) => allowedCourts.includes(c.is_central ? 10 : c.court_number))
+            .map((c) => c.id) || [];
+
+          setAllowedCourtIds(ids);
+        } else {
+          setAllowedCourtIds([]); // Pas de restriction
+        }
       } else {
-        setAllowedCourtIds([]); // Pas de restriction
+        setAllowedCourtIds([]);
       }
 
       setLoading(false);
