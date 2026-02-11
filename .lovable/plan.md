@@ -1,32 +1,15 @@
 
-## Corriger le trigger de restriction de date pour exclure les Super Coaches
 
-### Probleme identifie
+## Supprimer toutes les restrictions d'horizon de reservation
 
-Le trigger de base de donnees `validate_coach_date_restriction` applique incorrectement la restriction J+1 aux **Super Coaches**, alors que cette restriction ne devrait s'appliquer qu'aux **Coaches normaux**.
+### Objectif
+Rendre l'horizon de reservation illimite pour **tous les profils** (Joueur, Elite, Coach, Super Coach, Admin).
 
-**Code actuel du trigger :**
-```sql
-SELECT EXISTS (
-  SELECT 1 FROM user_roles 
-  WHERE user_id = NEW.player1_id 
-  AND role IN ('coach', 'super_coach')  -- ERREUR: inclut super_coach!
-) INTO player1_is_coach;
-```
+### Modifications necessaires
 
-**Regle metier correcte :**
-| Role | Restriction de date |
-|------|---------------------|
-| Coach | J+1 (aujourd'hui ou demain) |
-| Super Coach | Aucune (peut reserver n'importe quand) |
+#### 1. Base de donnees - Desactiver le trigger de restriction Coach (J+1)
 
-### Solution
-
-Modifier le trigger pour verifier uniquement le role `'coach'` et exclure `'super_coach'`.
-
-### Modification a apporter
-
-**Migration SQL** - Mettre a jour la fonction `validate_coach_date_restriction` :
+Remplacer la fonction `validate_coach_date_restriction` par une version qui ne bloque plus rien :
 
 ```sql
 CREATE OR REPLACE FUNCTION public.validate_coach_date_restriction()
@@ -35,76 +18,49 @@ LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path TO 'public'
 AS $function$
-DECLARE
-  player1_is_coach_only BOOLEAN;
-  player2_is_coach_only BOOLEAN;
-  player1_is_super_coach BOOLEAN;
-  player2_is_super_coach BOOLEAN;
-  max_allowed_date DATE;
 BEGIN
-  max_allowed_date := CURRENT_DATE + INTERVAL '1 day';
-  
-  -- Verifier si player1 est un coach (pas super_coach)
-  SELECT EXISTS (
-    SELECT 1 FROM user_roles 
-    WHERE user_id = NEW.player1_id 
-    AND role = 'coach'
-  ) INTO player1_is_coach_only;
-  
-  -- Verifier si player1 est un super_coach
-  SELECT EXISTS (
-    SELECT 1 FROM user_roles 
-    WHERE user_id = NEW.player1_id 
-    AND role = 'super_coach'
-  ) INTO player1_is_super_coach;
-  
-  -- Verifier si player2 est un coach (pas super_coach)
-  SELECT EXISTS (
-    SELECT 1 FROM user_roles 
-    WHERE user_id = NEW.player2_id 
-    AND role = 'coach'
-  ) INTO player2_is_coach_only;
-  
-  -- Verifier si player2 est un super_coach
-  SELECT EXISTS (
-    SELECT 1 FROM user_roles 
-    WHERE user_id = NEW.player2_id 
-    AND role = 'super_coach'
-  ) INTO player2_is_super_coach;
-  
-  -- Appliquer la restriction seulement si un joueur est COACH (pas super_coach)
-  -- ET que le partenaire n'est pas un entraineur (bypass symetrique)
-  -- Coach seul sans entraineur en face = restriction J+1
-  IF NEW.date > max_allowed_date THEN
-    -- Si player1 est coach simple (pas super) et player2 n'est pas entraineur
-    IF player1_is_coach_only AND NOT player1_is_super_coach 
-       AND NOT player2_is_coach_only AND NOT player2_is_super_coach THEN
-      RAISE EXCEPTION 'Les reservations avec un coach ne sont possibles que pour aujourd''hui ou demain';
-    END IF;
-    
-    -- Si player2 est coach simple (pas super) et player1 n'est pas entraineur
-    IF player2_is_coach_only AND NOT player2_is_super_coach 
-       AND NOT player1_is_coach_only AND NOT player1_is_super_coach THEN
-      RAISE EXCEPTION 'Les reservations avec un coach ne sont possibles que pour aujourd''hui ou demain';
-    END IF;
-  END IF;
-  
+  -- Plus aucune restriction de date pour les coachs
   RETURN NEW;
 END;
 $function$;
 ```
 
-### Rappel des regles de date par role
+#### 2. Base de donnees - Desactiver la restriction Elite (J+2) dans le trigger
 
-| Role | Horizon de reservation | Notes |
-|------|------------------------|-------|
-| Joueur | Illimite | Peut reserver n'importe quand |
-| Elite | J+2 | Maximum apres-demain |
-| Coach | J+1 | Maximum demain |
-| Super Coach | Illimite | Peut reserver n'importe quand |
-| Admin | Illimite | Peut creer des reservations pour n'importe quelle date |
+Modifier la fonction `validate_elite_restrictions` pour supprimer la verification de date (tout en conservant la limite de 2h par jour pour les Elite) :
 
-### Impact
-- DISLAM (super_coach) pourra reserver pour n'importe quelle date
-- Les coachs normaux restent limites a J+1
-- La logique symetrique est respectee : un joueur avec un coach = restriction J+1 pour le coach, pas pour le joueur
+```sql
+CREATE OR REPLACE FUNCTION public.validate_elite_restrictions()
+RETURNS trigger ...
+-- Supprimer le bloc qui verifie max_allowed_date
+-- Conserver le bloc qui verifie les heures quotidiennes (2h/jour)
+```
+
+#### 3. Frontend - BookingModal.tsx
+
+Modifier la fonction `checkPlayerDateRestriction` (lignes 268-297) pour ne plus bloquer sur les dates :
+- Supprimer la condition pour `elite` (J+2)
+- Supprimer la condition pour `coach` (J+1)
+- La fonction retournera toujours `{ ok: true }`
+
+#### 4. Frontend - useCoachRestrictions.tsx (aucune modification)
+
+Ce hook gere les restrictions de **terrains**, pas de dates. Il reste inchange.
+
+### Resume des changements
+
+| Avant | Apres |
+|-------|-------|
+| Coach : J+1 | Coach : Illimite |
+| Elite : J+2 | Elite : Illimite |
+| Joueur : Illimite | Joueur : Illimite |
+| Super Coach : Illimite | Super Coach : Illimite |
+| Admin : Illimite | Admin : Illimite |
+
+**Note** : La limite de 2 heures par jour pour les joueurs Elite est conservee (ce n'est pas un horizon de date mais un quota journalier).
+
+### Fichiers modifies
+
+1. **Migration SQL** : nouvelle migration pour mettre a jour les 2 fonctions de trigger
+2. **src/components/BookingModal.tsx** : simplifier `checkPlayerDateRestriction` pour toujours retourner ok
+
