@@ -258,41 +258,8 @@ export const BookingModal = ({
     if (blocked.data) setBlockedSlotsData(blocked.data);
   };
 
-  // Vérifier si un joueur a des restrictions de date (coach J+1, elite J+2)
-  const checkPlayerDateRestriction = async (playerId: string): Promise<{ ok: boolean; message?: string }> => {
-    const { data: roles } = await supabase
-      .from("user_roles")
-      .select("role")
-      .eq("user_id", playerId)
-      .in("role", ["coach", "super_coach", "elite"]);
-
-    const role = roles?.[0]?.role;
-    if (!role) return { ok: true };
-
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    if (role === "elite") {
-      // J+2 pour Elite
-      const maxDate = new Date(today);
-      maxDate.setDate(maxDate.getDate() + 2);
-      maxDate.setHours(23, 59, 59, 999);
-      
-      if (selectedDate && selectedDate > maxDate) {
-        return { ok: false, message: "Les joueurs Elite ne peuvent réserver que jusqu'à après-demain (J+2)" };
-      }
-  } else if (role === "coach") {
-      // J+1 seulement pour Coach (pas super_coach)
-      const tomorrow = new Date(today);
-      tomorrow.setDate(tomorrow.getDate() + 1);
-      tomorrow.setHours(23, 59, 59, 999);
-      
-      if (selectedDate && selectedDate > tomorrow) {
-        return { ok: false, message: "Les réservations avec un coach ne sont possibles que pour aujourd'hui ou demain" };
-      }
-    }
-    // super_coach : pas de restriction de date
-    
+  // Plus aucune restriction d'horizon de date pour aucun profil
+  const checkPlayerDateRestriction = async (_playerId: string): Promise<{ ok: boolean; message?: string }> => {
     return { ok: true };
   };
 
