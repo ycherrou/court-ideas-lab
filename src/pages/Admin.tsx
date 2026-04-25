@@ -18,6 +18,7 @@ import { BulkImportModal } from "@/components/BulkImportModal";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AuditLogViewer } from "@/components/AuditLogViewer";
+import { BlockedSlotsHistory } from "@/components/BlockedSlotsHistory";
 import { ReservationSettingsTab } from "@/components/ReservationSettingsTab";
 import { z } from "zod";
 
@@ -1140,6 +1141,8 @@ const Admin = () => {
               </Table>
             </CardContent>
           </Card>
+
+          <BlockedSlotsHistory />
         </div>
       </TabsContent>
 
