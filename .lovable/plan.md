@@ -1,90 +1,37 @@
+## Ajouter l'historique des blocages de terrains
 
+### Contexte
+Les actions de blocage (création/suppression) sont déjà tracées dans la table `audit_logs` avec `entity_type = 'BLOCKED_SLOT'`. Il suffit d'exposer cet historique dans l'interface admin, dédié aux blocages, en plus du journal global déjà disponible dans l'onglet "Historique".
 
-## Ajouter une page de configuration des regles de reservation
+### Modifications
 
-### Objectif
-Permettre a l'administrateur de modifier les regles de reservation (quotas, terrains, restrictions) depuis l'interface, sans intervention technique.
+#### 1. Nouveau composant `src/components/BlockedSlotsHistory.tsx`
 
-### 1. Nouvelle table `reservation_settings`
+Un composant léger qui affiche l'historique des blocages :
+- Charge les `audit_logs` filtrés sur `entity_type = 'BLOCKED_SLOT'`
+- Pagination (20 par page)
+- Filtres : type d'action (Création / Suppression / Tous), recherche par nom d'auteur, plage de dates
+- Tableau avec colonnes : Date/heure, Auteur, Action (badge coloré Création/Suppression), Description (ex: "Création blocage: Court 3 le 2026-04-25"), Détails (bouton qui ouvre un dialog avec `old_values`/`new_values` formatés : terrain, date, horaire, raison)
+- Bouton "Rafraîchir" et bouton "Exporter CSV"
 
-Stocker les regles configurables par role dans une table dediee :
+#### 2. Modification de `src/pages/Admin.tsx` - onglet Blocages
 
-```text
-reservation_settings
-+------------------+----------+---------+
-| role             | app_role | PK      |
-| max_active       | integer  | nullable|
-| max_hours_per_day| integer  | nullable|
-| allowed_courts   | text[]   | nullable|
-| can_create       | boolean  | default true |
-+------------------+----------+---------+
-```
+Restructurer l'onglet "Blocages" en sous-sections (cards empilées) :
+1. Formulaire "Nouveau blocage" (existant, inchangé)
+2. Tableau "Créneaux bloqués actifs" (existant, inchangé)
+3. **Nouveau** : Card "Historique des blocages" qui rend `<BlockedSlotsHistory />`
 
-- `role` : cle primaire, une ligne par role (player, elite, coach, super_coach, admin)
-- `max_active` : nombre max de reservations actives (null = illimite)
-- `max_hours_per_day` : limite d'heures par jour (null = illimite, ex: 2 pour elite)
-- `allowed_courts` : liste de numeros de terrain autorises (null = tous)
-- `can_create` : si le role peut creer des reservations (false pour coach actuellement)
+Aucun changement sur le formulaire ou la liste active.
 
-Donnees initiales basees sur les regles actuelles :
+#### 3. Aucune modification de la base de données
 
-| Role | max_active | max_hours_per_day | allowed_courts | can_create |
-|------|-----------|-------------------|----------------|------------|
-| player | 1 | null | null (tous) | true |
-| elite | null | 2 | null (tous) | true |
-| coach | 2 | null | {5,6,7,8,9,10} | false |
-| super_coach | 4 | null | null (tous) | true |
-| admin | null | null | null (tous) | true |
+L'audit existant suffit. Les actions `CREATE` et `DELETE` sur `BLOCKED_SLOT` sont déjà loggées dans `Admin.tsx` (lignes 582-591 pour la création, 237-243 pour la suppression).
 
-(10 = terrain central, on utilisera les court_number)
-
-### 2. Politiques RLS
-
-- SELECT : accessible a tous les utilisateurs authentifies (les regles doivent etre lisibles pour le frontend)
-- UPDATE/INSERT/DELETE : uniquement pour les admins
-
-### 3. Nouvel onglet "Regles" dans la page Admin
-
-Un nouvel onglet dans la page Admin existante avec :
-- Un tableau listant les 5 roles avec leurs regles editables
-- Pour chaque role, des champs modifiables :
-  - Quota de reservations actives (nombre ou "Illimite")
-  - Limite d'heures par jour (nombre ou "Illimite")
-  - Terrains autorises (selection multiple des terrains)
-  - Peut creer des reservations (oui/non)
-- Un bouton "Enregistrer" par ligne ou global
-- Log d'audit a chaque modification
-
-### 4. Modification du BookingModal
-
-Remplacer les valeurs en dur par une lecture de la table `reservation_settings` :
-- `getMaxReservations()` : lire `max_active` depuis la table
-- Restrictions de terrains : lire `allowed_courts` depuis la table
-- Verification coach `can_create` : lire depuis la table
-
-### 5. Modification des triggers de base de donnees
-
-Mettre a jour les fonctions de trigger pour lire depuis `reservation_settings` :
-- `validate_elite_restrictions()` : lire `max_hours_per_day` depuis la table
-- `validate_coach_court_restriction()` : lire `allowed_courts` depuis la table
-- `is_court_allowed_for_user()` : lire les terrains depuis la table
-
-### 6. Modification du hook `useCoachRestrictions`
-
-Adapter le hook pour lire les restrictions de terrains depuis `reservation_settings` au lieu de les coder en dur.
-
-### Fichiers concernes
-
-1. **Nouvelle migration SQL** : creation de la table, donnees initiales, RLS, mise a jour des triggers
-2. **src/pages/Admin.tsx** : ajout de l'onglet "Regles"
-3. **src/components/BookingModal.tsx** : lecture des regles depuis la table
-4. **src/hooks/useCoachRestrictions.tsx** : lecture des terrains autorises depuis la table
-5. **src/hooks/useReservationSettings.tsx** (nouveau) : hook pour charger les regles de reservation
+### Fichiers concernés
+- `src/components/BlockedSlotsHistory.tsx` (nouveau)
+- `src/pages/Admin.tsx` (ajout d'une card dans l'onglet Blocages)
 
 ### Avantages
-
-- L'admin peut modifier les quotas et restrictions sans demander de changement technique
-- Toutes les regles sont centralisees dans une seule table
-- Les triggers de base de donnees lisent aussi cette table, garantissant la coherence
-- Chaque modification est tracee dans le journal d'audit
-
+- Historique dédié et accessible directement depuis l'onglet Blocages, sans naviguer vers l'onglet Historique global
+- Réutilise l'infrastructure d'audit existante (aucune migration SQL)
+- Filtres et export CSV adaptés au contexte des blocages
