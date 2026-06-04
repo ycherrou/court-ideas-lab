@@ -51,6 +51,11 @@ const Admin = () => {
   const [reservationDateFilter, setReservationDateFilter] = useState("");
   const [reservationCourtFilter, setReservationCourtFilter] = useState("");
 
+  // Filtres blocages
+  const [blockedSearchQuery, setBlockedSearchQuery] = useState("");
+  const [blockedDateFilter, setBlockedDateFilter] = useState("");
+  const [blockedCourtFilter, setBlockedCourtFilter] = useState("");
+
   // Helper pour logger les actions d'audit
   const logAuditAction = async (
     actionType: "CREATE" | "UPDATE" | "DELETE",
