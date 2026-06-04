@@ -130,7 +130,7 @@ const Admin = () => {
           .gte("date", today)
           .order("date")
           .order("start_time"),
-        supabase.from("blocked_slots").select("*, court:courts(name)").order("date"),
+        supabase.from("blocked_slots").select("*, court:courts(name)").order("date", { ascending: false }),
         supabase.from("courts").select("*").order("court_number"),
       ]);
 
