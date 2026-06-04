@@ -51,6 +51,11 @@ const Admin = () => {
   const [reservationDateFilter, setReservationDateFilter] = useState("");
   const [reservationCourtFilter, setReservationCourtFilter] = useState("");
 
+  // Filtres blocages
+  const [blockedSearchQuery, setBlockedSearchQuery] = useState("");
+  const [blockedDateFilter, setBlockedDateFilter] = useState("");
+  const [blockedCourtFilter, setBlockedCourtFilter] = useState("");
+
   // Helper pour logger les actions d'audit
   const logAuditAction = async (
     actionType: "CREATE" | "UPDATE" | "DELETE",
@@ -130,7 +135,7 @@ const Admin = () => {
           .gte("date", today)
           .order("date")
           .order("start_time"),
-        supabase.from("blocked_slots").select("*, court:courts(name)").order("date"),
+        supabase.from("blocked_slots").select("*, court:courts(name)").order("date", { ascending: false }),
         supabase.from("courts").select("*").order("court_number"),
       ]);
 
@@ -630,6 +635,27 @@ const Admin = () => {
     setReservationCourtFilter("");
   };
 
+  const filteredBlockedSlots = blockedSlots.filter((slot) => {
+    const matchesSearch =
+      blockedSearchQuery === "" ||
+      slot.reason.toLowerCase().includes(blockedSearchQuery.toLowerCase()) ||
+      (slot.court?.name || "").toLowerCase().includes(blockedSearchQuery.toLowerCase());
+
+    const matchesDate = blockedDateFilter === "" || slot.date === blockedDateFilter;
+
+    const matchesCourt = blockedCourtFilter === "" || slot.court_id === blockedCourtFilter;
+
+    return matchesSearch && matchesDate && matchesCourt;
+  });
+
+  const hasBlockedFilters = blockedSearchQuery || blockedDateFilter || blockedCourtFilter;
+
+  const clearBlockedFilters = () => {
+    setBlockedSearchQuery("");
+    setBlockedDateFilter("");
+    setBlockedCourtFilter("");
+  };
+
   if (authLoading || roleLoading || loading) {
     return (
       <div className="min-h-screen p-8">
@@ -1102,9 +1128,53 @@ const Admin = () => {
 
               <Card>
                 <CardHeader>
-                  <CardTitle>Créneaux bloqués</CardTitle>
+                  <div className="flex items-center justify-between flex-wrap gap-2">
+                    <div>
+                      <CardTitle>Créneaux bloqués</CardTitle>
+                      <CardDescription>
+                        {filteredBlockedSlots.length} blocage{filteredBlockedSlots.length > 1 ? "s" : ""}
+                        {hasBlockedFilters && ` (${blockedSlots.length} total)`}
+                      </CardDescription>
+                    </div>
+                    {hasBlockedFilters && (
+                      <Button variant="outline" size="sm" onClick={clearBlockedFilters}>
+                        <X className="h-4 w-4 mr-2" />
+                        Effacer les filtres
+                      </Button>
+                    )}
+                  </div>
                 </CardHeader>
                 <CardContent>
+                  <div className="mb-4 grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        placeholder="Rechercher..."
+                        value={blockedSearchQuery}
+                        onChange={(e) => setBlockedSearchQuery(e.target.value)}
+                        className="pl-10"
+                      />
+                    </div>
+                    <Input
+                      type="date"
+                      value={blockedDateFilter}
+                      onChange={(e) => setBlockedDateFilter(e.target.value)}
+                    />
+                    <Select value={blockedCourtFilter} onValueChange={setBlockedCourtFilter}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Tous les terrains" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Tous les terrains</SelectItem>
+                        {courts.map((court) => (
+                          <SelectItem key={court.id} value={court.id}>
+                            {court.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
                   <Table>
                     <TableHeader>
                       <TableRow>
@@ -1116,31 +1186,39 @@ const Admin = () => {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {blockedSlots.map((slot) => (
-                        <TableRow key={slot.id}>
-                          <TableCell>
-                            {new Date(slot.date).toLocaleDateString("fr-FR")}
-                          </TableCell>
-                          <TableCell>
-                            {slot.start_time.slice(0, 5)} - {slot.end_time.slice(0, 5)}
-                          </TableCell>
-                          <TableCell>{slot.court?.name || "Tous"}</TableCell>
-                          <TableCell>{slot.reason}</TableCell>
-                          <TableCell>
-                            <Button
-                              variant="destructive"
-                              size="sm"
-                              onClick={() => handleDeleteBlockedSlot(slot.id)}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
+                      {filteredBlockedSlots.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+                            {hasBlockedFilters ? "Aucun blocage ne correspond aux filtres" : "Aucun créneau bloqué"}
                           </TableCell>
                         </TableRow>
-                      ))}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
+                      ) : (
+                        filteredBlockedSlots.map((slot) => (
+                          <TableRow key={slot.id}>
+                            <TableCell>
+                              {new Date(slot.date).toLocaleDateString("fr-FR")}
+                            </TableCell>
+                            <TableCell>
+                              {slot.start_time.slice(0, 5)} - {slot.end_time.slice(0, 5)}
+                            </TableCell>
+                            <TableCell>{slot.court?.name || "Tous"}</TableCell>
+                            <TableCell>{slot.reason}</TableCell>
+                            <TableCell>
+                              <Button
+                                variant="destructive"
+                                size="sm"
+                                onClick={() => handleDeleteBlockedSlot(slot.id)}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        ))
+                      )}
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
 
           <BlockedSlotsHistory />
         </div>
