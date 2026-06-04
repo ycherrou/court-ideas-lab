@@ -635,6 +635,27 @@ const Admin = () => {
     setReservationCourtFilter("");
   };
 
+  const filteredBlockedSlots = blockedSlots.filter((slot) => {
+    const matchesSearch =
+      blockedSearchQuery === "" ||
+      slot.reason.toLowerCase().includes(blockedSearchQuery.toLowerCase()) ||
+      (slot.court?.name || "").toLowerCase().includes(blockedSearchQuery.toLowerCase());
+
+    const matchesDate = blockedDateFilter === "" || slot.date === blockedDateFilter;
+
+    const matchesCourt = blockedCourtFilter === "" || slot.court_id === blockedCourtFilter;
+
+    return matchesSearch && matchesDate && matchesCourt;
+  });
+
+  const hasBlockedFilters = blockedSearchQuery || blockedDateFilter || blockedCourtFilter;
+
+  const clearBlockedFilters = () => {
+    setBlockedSearchQuery("");
+    setBlockedDateFilter("");
+    setBlockedCourtFilter("");
+  };
+
   if (authLoading || roleLoading || loading) {
     return (
       <div className="min-h-screen p-8">
