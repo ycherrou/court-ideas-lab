@@ -9,9 +9,9 @@ export const useUserRole = (userId: string | undefined) => {
     let cancelled = false;
 
     if (!userId) {
-      // Pas d'utilisateur encore disponible: rester en chargement pour éviter des redirections prématurées
+      // L'auth est gérée par useAuth ; sans utilisateur, ne pas bloquer les redirections.
       setIsAdmin(false);
-      setLoading(true);
+      setLoading(false);
       return;
     }
 
@@ -29,21 +29,19 @@ export const useUserRole = (userId: string | undefined) => {
         if (cancelled) return;
 
         if (error) {
-          // En cas d'erreur réseau/permission ponctuelle, éviter de conclure "non admin" trop vite
-          // On laisse le loader actif et on retente une fois rapidement.
-          setTimeout(() => {
-            if (!cancelled) fetchRole();
-          }, 300);
+          console.error("Erreur lors du chargement du rôle utilisateur:", error);
+          setIsAdmin(false);
+          setLoading(false);
           return;
         }
 
         setIsAdmin(!!data);
         setLoading(false);
-      } catch {
+      } catch (error) {
         if (cancelled) return;
-        setTimeout(() => {
-          if (!cancelled) fetchRole();
-        }, 300);
+        console.error("Erreur lors du chargement du rôle utilisateur:", error);
+        setIsAdmin(false);
+        setLoading(false);
       }
     };
 
