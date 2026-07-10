@@ -1,37 +1,29 @@
-## Ajouter l'historique des blocages de terrains
+## Situation
 
-### Contexte
-Les actions de blocage (création/suppression) sont déjà tracées dans la table `audit_logs` avec `entity_type = 'BLOCKED_SLOT'`. Il suffit d'exposer cet historique dans l'interface admin, dédié aux blocages, en plus du journal global déjà disponible dans l'onglet "Historique".
+Je n'ai touché à aucun fichier. La panne de connexion venait du backend : PostgREST renvoyait `PGRST002` ("Could not query the database for the schema cache"), donc la fonction `login-with-username` ne trouvait plus aucun profil et répondait "Identifiants invalides".
 
-### Modifications
+J'ai déclenché un redémarrage du backend Lovable Cloud. Aucun code applicatif n'a été modifié.
 
-#### 1. Nouveau composant `src/components/BlockedSlotsHistory.tsx`
+## Étape 1 — Vérification (toi)
 
-Un composant léger qui affiche l'historique des blocages :
-- Charge les `audit_logs` filtrés sur `entity_type = 'BLOCKED_SLOT'`
-- Pagination (20 par page)
-- Filtres : type d'action (Création / Suppression / Tous), recherche par nom d'auteur, plage de dates
-- Tableau avec colonnes : Date/heure, Auteur, Action (badge coloré Création/Suppression), Description (ex: "Création blocage: Court 3 le 2026-04-25"), Détails (bouton qui ouvre un dialog avec `old_values`/`new_values` formatés : terrain, date, horaire, raison)
-- Bouton "Rafraîchir" et bouton "Exporter CSV"
+1. Attends 1–2 minutes que le backend finisse de redémarrer.
+2. Recharge la page `/auth` (Ctrl+Shift+R).
+3. Retente la connexion `admin` + code PIN.
 
-#### 2. Modification de `src/pages/Admin.tsx` - onglet Blocages
+Si ça fonctionne, il n'y a rien d'autre à faire.
 
-Restructurer l'onglet "Blocages" en sous-sections (cards empilées) :
-1. Formulaire "Nouveau blocage" (existant, inchangé)
-2. Tableau "Créneaux bloqués actifs" (existant, inchangé)
-3. **Nouveau** : Card "Historique des blocages" qui rend `<BlockedSlotsHistory />`
+## Étape 2 — Si le problème persiste après redémarrage
 
-Aucun changement sur le formulaire ou la liste active.
+Dans ce cas, on renforce la fonction edge `login-with-username` pour qu'elle ne renvoie plus "Identifiants invalides" quand la vraie cause est une erreur backend :
 
-#### 3. Aucune modification de la base de données
+- Détecter les codes d'erreur PostgREST/infrastructure (`PGRST002`, timeouts, erreurs réseau) séparément de "profil introuvable".
+- Renvoyer un message explicite comme "Service temporairement indisponible, réessayez dans quelques instants" avec un statut 503.
+- Ajouter une petite logique de retry (2 tentatives espacées de 500 ms) sur la lecture du profil pour absorber les cache-miss transitoires.
 
-L'audit existant suffit. Les actions `CREATE` et `DELETE` sur `BLOCKED_SLOT` sont déjà loggées dans `Admin.tsx` (lignes 582-591 pour la création, 237-243 pour la suppression).
+Aucune modification de base de données, aucun changement d'UI, aucun impact sur les autres écrans.
 
-### Fichiers concernés
-- `src/components/BlockedSlotsHistory.tsx` (nouveau)
-- `src/pages/Admin.tsx` (ajout d'une card dans l'onglet Blocages)
+## Fichier concerné (étape 2 uniquement)
 
-### Avantages
-- Historique dédié et accessible directement depuis l'onglet Blocages, sans naviguer vers l'onglet Historique global
-- Réutilise l'infrastructure d'audit existante (aucune migration SQL)
-- Filtres et export CSV adaptés au contexte des blocages
+- `supabase/functions/login-with-username/index.ts`
+
+Dis-moi simplement si la connexion remarche après le redémarrage, ou si tu veux qu'on passe directement à l'étape 2.
