@@ -34,15 +34,38 @@ Deno.serve(async (req) => {
     const normalizedUsername = username.toLowerCase().replace(/\s+/g, '');
     console.log(`Username normalisé: "${normalizedUsername}" (longueur: ${normalizedUsername.length})`);
 
-    // Utiliser le client admin pour chercher le profil (pas soumis aux RLS)
-    const { data: profile, error: profileError } = await supabaseAdmin
-      .from("profiles")
-      .select("id, email, must_change_password, temporary_pin, username")
-      .eq("username", normalizedUsername)
-      .maybeSingle();
+    // Retry sur erreurs transitoires du cache de schéma PostgREST
+    let profile: any = null;
+    let profileError: any = null;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const res = await supabaseAdmin
+        .from("profiles")
+        .select("id, email, must_change_password, temporary_pin, username")
+        .eq("username", normalizedUsername)
+        .maybeSingle();
+      profile = res.data;
+      profileError = res.error;
+
+      // Erreur transitoire d'infrastructure -> on retente
+      const transientCodes = ["PGRST002", "PGRST001", "57P03", "08006", "08000"];
+      if (profileError && transientCodes.includes(profileError.code)) {
+        console.warn(`Erreur transitoire (${profileError.code}), tentative ${attempt + 1}/3`);
+        await new Promise((r) => setTimeout(r, 500));
+        continue;
+      }
+      break;
+    }
 
     console.log(`Résultat recherche - Error:`, profileError);
     console.log(`Résultat recherche - Profile trouvé:`, profile ? `Oui (${profile.email})` : 'Non');
+
+    // Si toujours en erreur infra après retries -> 503 explicite
+    if (profileError && ["PGRST002", "PGRST001", "57P03", "08006", "08000"].includes(profileError.code)) {
+      return new Response(
+        JSON.stringify({ error: "Service temporairement indisponible, réessayez dans quelques instants." }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 503 }
+      );
+    }
 
     if (profileError || !profile) {
       console.error(`Profil non trouvé pour username: "${normalizedUsername}"`);
