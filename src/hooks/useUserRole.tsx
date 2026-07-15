@@ -4,21 +4,22 @@ import { supabase } from "@/integrations/supabase/client";
 export const useUserRole = (userId: string | undefined) => {
   const [isAdmin, setIsAdmin] = React.useState(false);
   const [loading, setLoading] = React.useState(true);
+  const [resolvedForUserId, setResolvedForUserId] = React.useState<string | undefined>(undefined);
 
   React.useEffect(() => {
     let cancelled = false;
 
     if (!userId) {
-      // L'auth est gérée par useAuth ; sans utilisateur, ne pas bloquer les redirections.
       setIsAdmin(false);
       setLoading(false);
+      setResolvedForUserId(undefined);
       return;
     }
 
+    setLoading(true);
+
     const fetchRole = async () => {
       try {
-        setLoading(true);
-
         const { data, error } = await supabase
           .from("user_roles")
           .select("role")
@@ -31,16 +32,16 @@ export const useUserRole = (userId: string | undefined) => {
         if (error) {
           console.error("Erreur lors du chargement du rôle utilisateur:", error);
           setIsAdmin(false);
-          setLoading(false);
-          return;
+        } else {
+          setIsAdmin(!!data);
         }
-
-        setIsAdmin(!!data);
+        setResolvedForUserId(userId);
         setLoading(false);
       } catch (error) {
         if (cancelled) return;
         console.error("Erreur lors du chargement du rôle utilisateur:", error);
         setIsAdmin(false);
+        setResolvedForUserId(userId);
         setLoading(false);
       }
     };
@@ -52,5 +53,9 @@ export const useUserRole = (userId: string | undefined) => {
     };
   }, [userId]);
 
-  return { isAdmin, loading };
+  // Consider still loading if the resolved role does not match the current userId yet.
+  // This prevents a race where a stale "not admin" flashes when userId changes.
+  const effectiveLoading = loading || (!!userId && resolvedForUserId !== userId);
+
+  return { isAdmin, loading: effectiveLoading };
 };
