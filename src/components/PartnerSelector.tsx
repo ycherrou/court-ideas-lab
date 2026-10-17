@@ -116,7 +116,29 @@ export function PartnerSelector({
       profilesQuery = profilesQuery.not("id", "in", `(${adminIds.join(",")})`);
     }
 
-    const { data: profiles } = await profilesQuery;
+    const { data: rawProfiles } = await profilesQuery;
+
+    // Profils Passager / Invité réservés aux administrateurs
+    const { data: authData } = await supabase.auth.getUser();
+    const currentUid = authData.user?.id;
+    let viewerIsAdmin = false;
+    if (currentUid) {
+      const { data: myRoles } = await supabase
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", currentUid)
+        .eq("role", "admin");
+      viewerIsAdmin = (myRoles?.length || 0) > 0;
+    }
+    const isGuest = (p: { full_name?: string | null; username?: string | null }) => {
+      const n = (p.full_name || "").toUpperCase();
+      const u = (p.username || "").toLowerCase();
+      return n.startsWith("PASSAGER") || n.startsWith("INVITE") || n.startsWith("INVITÉ") ||
+        u.startsWith("passager") || u.startsWith("invite");
+    };
+    const profiles = rawProfiles
+      ? viewerIsAdmin ? rawProfiles : rawProfiles.filter((p) => !isGuest(p))
+      : null;
 
     if (profiles) {
       setAllPartners(profiles);
