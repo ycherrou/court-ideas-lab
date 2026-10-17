@@ -285,6 +285,7 @@ export type Database = {
         Args: { _court_id: string; _user_id: string }
         Returns: boolean
       }
+      is_guest_profile: { Args: { _user_id: string }; Returns: boolean }
       log_action: {
         Args: {
           _action_type: string
