@@ -40,8 +40,8 @@ const MyReservations = () => {
         .select(`
           *,
           court:courts(name),
-          player1:player1_id(full_name),
-          player2:player2_id(full_name)
+          player1:player1_id(id, full_name),
+          player2:player2_id(id, full_name)
         `);
 
       // Si l'utilisateur n'est pas admin, filtrer par ses réservations
