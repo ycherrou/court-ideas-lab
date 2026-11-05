@@ -274,6 +274,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      count_active_free_reservations: {
+        Args: { _user_id: string }
+        Returns: number
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -286,6 +290,7 @@ export type Database = {
         Returns: boolean
       }
       is_guest_profile: { Args: { _user_id: string }; Returns: boolean }
+      is_instructor: { Args: { _user_id: string }; Returns: boolean }
       log_action: {
         Args: {
           _action_type: string

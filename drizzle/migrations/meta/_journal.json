@@ -15,6 +15,13 @@
       "when": 1793911063599,
       "tag": "0001_audit_reservation_delete",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1793911778146,
+      "tag": "0002_count_active_non_coach_reservations",
+      "breakpoints": true
     }
   ]
 }
