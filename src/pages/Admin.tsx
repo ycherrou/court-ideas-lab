@@ -209,23 +209,8 @@ const Admin = () => {
     if (error) {
       toast.error("Erreur lors de l'annulation");
     } else {
-      // Logger l'action
-      await logAuditAction(
-        "DELETE",
-        "RESERVATION",
-        id,
-        {
-          date: reservation?.date,
-          court: reservation?.court?.name,
-          start_time: reservation?.start_time,
-          end_time: reservation?.end_time,
-          player1: reservation?.player1?.full_name,
-          player2: reservation?.player2?.full_name,
-        },
-        null,
-        `Annulation réservation: ${reservation?.player1?.full_name} vs ${reservation?.player2?.full_name} le ${reservation?.date}`
-      );
-
+      // L'annulation est journalisée automatiquement côté base de données
+      void reservation;
       toast.success("Réservation annulée");
       fetchData();
     }
