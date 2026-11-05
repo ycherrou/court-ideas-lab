@@ -488,17 +488,21 @@ export const BookingModal = ({
         .or(`player1_id.eq.${player1Id},player2_id.eq.${player1Id}`)
         .gte('date', todayStr);
 
-      const player1ActiveCount = player1ActiveRes ? countActiveReservations(player1ActiveRes, todayStr, currentTime) : 0;
+      // Rôles entraîneur vérifiés côté serveur (les membres ne peuvent pas lire les rôles des autres)
+      const [{ data: p1Instr }, { data: p2Instr }] = await Promise.all([
+        supabase.rpc("is_instructor", { _user_id: player1Id }),
+        supabase.rpc("is_instructor", { _user_id: player2Id }),
+      ]);
+      const player1IsInstructor = !!p1Instr;
+      const player2IsInstructor = !!p2Instr;
 
-      // Vérifier si player2 est un entraîneur (pour ignorer limite player1)
-      const player2IsCoach = await isCoach(player2Id);
-      const player2IsSuperCoach = await isSuperCoach(player2Id);
-      const player2IsInstructor = player2IsCoach || player2IsSuperCoach;
-
-      // Vérifier si player1 est un entraîneur (pour ignorer limite player2)
-      const player1IsCoach = await isCoach(player1Id);
-      const player1IsSuperCoach = await isSuperCoach(player1Id);
-      const player1IsInstructor = player1IsCoach || player1IsSuperCoach;
+      // Pour un adhérent, les réservations avec un coach ne comptent pas dans son quota
+      const freeCount = async (id: string, isInstr: boolean, rows: any[] | null) => {
+        if (isInstr) return rows ? countActiveReservations(rows, todayStr, currentTime) : 0;
+        const { data } = await supabase.rpc("count_active_free_reservations", { _user_id: id });
+        return (data as number) ?? 0;
+      };
+      const player1ActiveCount = await freeCount(player1Id, player1IsInstructor, player1ActiveRes);
 
       // Si player2 est un entraîneur, on ignore la limite du joueur 1
       if (!player2IsInstructor && player1ActiveCount >= player1MaxRes) {
@@ -519,7 +523,7 @@ export const BookingModal = ({
         .or(`player1_id.eq.${player2Id},player2_id.eq.${player2Id}`)
         .gte('date', todayStr);
 
-      const player2ActiveCount = player2ActiveRes ? countActiveReservations(player2ActiveRes, todayStr, currentTime) : 0;
+      const player2ActiveCount = await freeCount(player2Id, player2IsInstructor, player2ActiveRes);
 
       // Si player1 est un entraîneur, on ignore la limite du joueur 2
       if (!player1IsInstructor && player2ActiveCount >= player2MaxRes) {
