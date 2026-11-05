@@ -8,6 +8,13 @@
       "when": 1792262086011,
       "tag": "0000_restrict_guest_profiles_to_admins",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1793911063599,
+      "tag": "0001_audit_reservation_delete",
+      "breakpoints": true
     }
   ]
 }
