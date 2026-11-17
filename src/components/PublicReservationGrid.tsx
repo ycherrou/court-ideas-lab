@@ -77,19 +77,16 @@ export const PublicReservationGrid = ({ date }: { date: Date }) => {
     try {
       const [courtsData, reservationsData, blockedData] = await Promise.all([
         supabase.from("courts").select("*").order("court_number"),
-        supabase
-          .from("reservations")
-          .select(`
-            id, court_id, start_time, end_time, player1_id, player2_id,
-            player1:player1_id(full_name),
-            player2:player2_id(full_name)
-          `)
-          .eq("date", dateString),
+        supabase.rpc("get_public_reservations", { _date: dateString }),
         supabase.from("blocked_slots").select("*").eq("date", dateString),
       ]);
 
       if (courtsData.data) setCourts(courtsData.data);
-      if (reservationsData.data) setReservations(reservationsData.data as any);
+      if (reservationsData.data) setReservations((reservationsData.data as any[]).map((r) => ({
+        ...r,
+        player1: { full_name: r.player1_name },
+        player2: { full_name: r.player2_name },
+      })) as any);
       if (blockedData.data) setBlockedSlots(blockedData.data);
     } catch (error) {
       console.error("Erreur lors du chargement des données", error);

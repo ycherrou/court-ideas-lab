@@ -299,7 +299,7 @@ export const BookingModal = ({
       supabase.from("courts").select("*").order("court_number"),
       supabase.from("reservations").select("*").eq("date", dateStr),
       supabase.from("blocked_slots").select("*").eq("date", dateStr),
-      supabase.from("profiles").select("*").neq("id", userId),
+      supabase.from("profiles").select("id, full_name, username, created_at, must_change_password").neq("id", userId),
     ]);
 
     if (courtsData.data) setCourts(courtsData.data);

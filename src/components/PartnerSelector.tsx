@@ -29,7 +29,8 @@ interface PartnerSelectorProps {
 interface Partner {
   id: string;
   full_name: string;
-  email: string;
+  email?: string;
+  username?: string | null;
 }
 
 export function PartnerSelector({
@@ -108,7 +109,7 @@ export function PartnerSelector({
     // Load all partners except current user and admins (include coaches)
     let profilesQuery = supabase
       .from("profiles")
-      .select("*")
+      .select("id, full_name, username, created_at, must_change_password")
       .neq("id", userId)
       .order("full_name");
 
@@ -219,7 +220,7 @@ export function PartnerSelector({
     return partners.filter(
       (p) =>
         p.full_name.toLowerCase().includes(query) ||
-        p.email.toLowerCase().includes(query)
+        (p.username ?? "").toLowerCase().includes(query)
     );
   };
 

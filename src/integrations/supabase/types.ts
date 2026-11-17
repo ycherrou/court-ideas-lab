@@ -274,9 +274,38 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      admin_list_profiles: {
+        Args: never
+        Returns: {
+          created_at: string
+          email: string
+          full_name: string
+          id: string
+          must_change_password: boolean | null
+          temporary_pin: string | null
+          username: string | null
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "profiles"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
       count_active_free_reservations: {
         Args: { _user_id: string }
         Returns: number
+      }
+      get_public_reservations: {
+        Args: { _date: string }
+        Returns: {
+          court_id: string
+          end_time: string
+          id: string
+          player1_name: string
+          player2_name: string
+          start_time: string
+        }[]
       }
       has_role: {
         Args: {

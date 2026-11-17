@@ -123,7 +123,7 @@ const Admin = () => {
       const today = `${todayYear}-${todayMonth}-${todayDay}`;
       
       const [membersData, reservationsData, blockedData, courtsData] = await Promise.all([
-        supabase.from("profiles").select("*").order("created_at", { ascending: false }),
+        supabase.rpc("admin_list_profiles"),
         supabase
           .from("reservations")
           .select(`
